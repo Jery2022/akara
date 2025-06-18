@@ -27,7 +27,7 @@
                   <td>{$row['produit_id']}</td>
                   <td>{$row['quantity']}</td>
                   <td>{$row['total']}</td>
-                  <td>{$row['date']}</td>
+                  <td>{$row['date_recette']}</td>
                 </tr>";
             }
         ?>

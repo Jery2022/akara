@@ -51,14 +51,14 @@ if (! $pdo) {
 
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'GET':
-        // Récupérer tous les contrats
+        // Récupère tous les contrats
         $stmt  = $pdo->query("SELECT * FROM contrats");
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($items);
         break;
 
     case 'POST':
-        // Ajouter un contrat
+        // Ajoute un contrat
         $data = json_decode(file_get_contents('php://input'), true);
         if (! isset($data['ref'], $data['objet'], $data['date_debut'], $data['date_fin'], $data['montant'], $data['type'], $data['date_signature'])) {
             echo json_encode(['error' => 'Champs obligatoires manquants']);
@@ -88,6 +88,7 @@ switch ($_SERVER['REQUEST_METHOD']) {
         echo json_encode([
             'success' => true,
             'id'      => $pdo->lastInsertId(),
+            'message' => 'Contrat ajouté avec succès',
         ]);
         break;
 

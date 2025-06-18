@@ -109,32 +109,7 @@
     <h2 class="mb-4">Gestion des utilisateurs</h2>
     <?php echo $message ?>
 
-    <!-- Formulaire d'ajout d'un utilisateur
-    <form method="post" class="row g-5 mb-4">
-        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>">
-        <div class="col-md-3">
-            <input type="email" name="email" placeholder="Email" required class="form-control">
-        </div>
-        <div class="col-md-3">
-            <input type="password" name="password" placeholder="Mot de passe" required class="form-control">
-        </div>
-        <div class="col-md-2">
-            <select name="role" class="form-select">
-                <option value="admin">Admin</option>
-                <option value="employe" selected>Employé</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <select name="statut" class="form-select">
-                <option value="actif" selected>Actif</option>
-                <option value="désactivé">Désactivé</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" name="add" class="btn btn-success w-100">Ajouter</button>
-        </div>
-    </form>
--->
+    <!-- Bouton pour ajouter un utilisateur -->
     <div class="mb-3">
         <button
             class="btn btn-primary btn-md"
@@ -152,21 +127,21 @@
         <div class="col-md-3">
             <select name="role" class="form-select">
                 <option value="">Tous les rôles</option>
-                <option value="admin"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            <?php echo($roleFilter === 'admin') ? 'selected' : ''; ?>>Admin</option>
-                <option value="employe"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <?php echo($roleFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
+                <option value="admin"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($roleFilter === 'admin') ? 'selected' : ''; ?>>Admin</option>
+                <option value="employe"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($roleFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="statut" class="form-select">
                 <option value="">Tous les statuts</option>
-                <option value="actif"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            <?php echo($statutFilter === 'actif') ? 'selected' : ''; ?>>Actif</option>
-                <option value="désactivé"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <?php echo($statutFilter === 'désactivé') ? 'selected' : ''; ?>>Désactivé</option>
+                <option value="actif"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statutFilter === 'actif') ? 'selected' : ''; ?>>Actif</option>
+                <option value="désactivé"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statutFilter === 'désactivé') ? 'selected' : ''; ?>>Désactivé</option>
             </select>
         </div>
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">
