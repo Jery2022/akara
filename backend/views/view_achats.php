@@ -22,7 +22,7 @@
     $order          = $_GET['order'] ?? 'ASC';
 
     // Validation des paramètres de tri
-    $validSortColumns = ['id', 'contrat_id', 'user_id', 'customer_id', 'amount'];
+    $validSortColumns = ['id', 'contrat_id', 'user_id', 'supplier_id', 'amount'];
     if (! in_array($sortBy, $validSortColumns)) {
         $sortBy = 'customers_id'; // Valeur par défaut
     }
@@ -30,7 +30,7 @@
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
     // Construction de la requête SQL
-    $query  = "SELECT * FROM payments WHERE 1=1";
+    $query  = "SELECT * FROM achats WHERE 1=1";
     $params = [];
 
     if ($typeFilter) {
@@ -47,14 +47,14 @@
 
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
-    $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $achats = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-  <title>Gestion Paiements</title>
+  <title>Gestion Achat</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
 </head>
 <body>
   <div class="container my-4">
-    <h2>Liste des paiements</h2>
+    <h2>Liste des achats</h2>
            <?php echo $message ?>
 
      <!-- Formulaire de filtre -->
@@ -73,10 +73,24 @@
         <div class="col-md-3">
             <select name="category" class="form-select">
                 <option value="">Toutes les catégories</option>
-                <option value="travaux"
-                  <?php echo($categoryFilter === "travaux") ? 'selected' : ''; ?>>Travaux</option>
-                <option value="services"
-                  <?php echo($categoryFilter === "services") ? 'selected' : ''; ?>>Services</option>
+                <option value="fournitures"
+                  <?php echo($categoryFilter === "fournitures") ? 'selected' : ''; ?>>Fournitures</option>
+                <option value="élecricité"
+                  <?php echo($categoryFilter === "élecricité") ? 'selected' : ''; ?>>Elecricité</option>
+                <option value="téléphone"
+                  <?php echo($categoryFilter === "téléphone") ? 'selected' : ''; ?>>Téléphone</option>
+                <option value="carburant"
+                  <?php echo($categoryFilter === "carburant") ? 'selected' : ''; ?>>Carburant</option>
+                <option value="eau"
+                  <?php echo($categoryFilter === "eau") ? 'selected' : ''; ?>>Eau</option>
+                <option value="mobiliers"
+                  <?php echo($categoryFilter === "mobiliers") ? 'selected' : ''; ?>>Mobiliers</option>
+                                  <option value="fiscalité"
+                  <?php echo($categoryFilter === "fiscalité") ? 'selected' : ''; ?>>fiscalité</option>
+                                  <option value="impôts"
+                  <?php echo($categoryFilter === "impôts") ? 'selected' : ''; ?>>Impôts</option>
+                                  <option value="taxes"
+                  <?php echo($categoryFilter === "taxes") ? 'selected' : ''; ?>>Taxes</option>
             </select>
         </div>
 
@@ -93,36 +107,36 @@
         </div>
     </form>
 
-    <!-- Tableau des paiements -->
+    <!-- Tableau des achats -->
     <table class="table table-striped table-hover">
       <thead>
         <tr>
           <th>ID</th>
           <th>Contrat</th>
           <th>Reçu par</th>
-          <th>Client</th>
+          <th>Fournisseur</th>
           <th>Montant</th>
           <th>Type</th>
           <th>Catégorie</th>
-          <th>Date paiement</th>
+          <th>Date achat</th>
         </tr>
       </thead>
       <tbody>
-          <?php if (empty($payments)): ?>
+          <?php if (empty($achats)): ?>
               <tr>
-                  <td colspan="10" class="text-center">Aucun paiement trouvé.</td>
+                  <td colspan="10" class="text-center">Aucun achat trouvé.</td>
               </tr>
           <?php else: ?>
-<?php foreach ($payments as $row): ?>
+<?php foreach ($achats as $row): ?>
             <tr>
                   <td><?php echo htmlspecialchars($row['id']) ?></td>
                   <td><?php echo htmlspecialchars($row['contrat_id']) ?></td>
                   <td><?php echo htmlspecialchars($row['user_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['customer_id']) ?></td>
+                  <td><?php echo htmlspecialchars($row['suppliers_id']) ?></td>
                   <td><?php echo htmlspecialchars($row['amount']) ?></td>
                   <td><?php echo htmlspecialchars($row['type']) ?></td>
                   <td><?php echo htmlspecialchars($row['category']) ?></td>
-                  <td><?php echo htmlspecialchars($row['date_payment']) ?></td>
+                  <td><?php echo htmlspecialchars($row['date_achat']) ?></td>
             </tr>
         <?php endforeach; ?>
 <?php endif; ?>

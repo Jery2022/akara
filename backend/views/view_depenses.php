@@ -22,7 +22,7 @@
     $order          = $_GET['order'] ?? 'ASC';
 
     // Validation des paramètres de tri
-    $validSortColumns = ['id', 'produit_id', 'user_id', 'customer_id', 'contrat_id'];
+    $validSortColumns = ['id', 'produit_id', 'user_id', 'supplier_id', 'contrat_id'];
     if (! in_array($sortBy, $validSortColumns)) {
         $sortBy = 'produit_id'; // Valeur par défaut
     }
@@ -30,7 +30,7 @@
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
     // Construction de la requête SQL
-    $query  = "SELECT * FROM recettes WHERE 1=1";
+    $query  = "SELECT * FROM depenses WHERE 1=1";
     $params = [];
 
     if ($natureFilter) {
@@ -47,14 +47,14 @@
 
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
-    $recettes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $depenses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-  <title>Gestion Recettes</title>
+  <title>Gestion Dépenses</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
 </head>
 <body>
   <div class="container my-4">
-    <h2>Liste des recettes</h2>
+    <h2>Liste des dépenses</h2>
         <?php echo $message ?>
 
      <!-- Formulaire de filtre -->
@@ -62,8 +62,8 @@
         <div class="col-md-3">
             <select name="nature" class="form-select">
                 <option value="">Toutes les natures</option>
-                <option value="vente"
-                  <?php echo($natureFilter === "vente") ? 'selected' : ''; ?>>Vente</option>
+                <option value="achat"
+                  <?php echo($natureFilter === "achat") ? 'selected' : ''; ?>>Achat</option>
                 <option value="location"
                   <?php echo($natureFilter === "location") ? 'selected' : ''; ?>>Location</option>
             </select>
@@ -71,19 +71,17 @@
         <div class="col-md-3">
             <select name="category" class="form-select">
                 <option value="">Toutes les catégories</option>
-                <option value="construction"
-                  <?php echo($categoryFilter === "construction") ? 'selected' : ''; ?>>Construction</option>
-                <option value="sécurité"
-                  <?php echo($categoryFilter === "sécurité") ? 'selected' : ''; ?>>Sécurité</option>
-                <option value="hygiène"
-                  <?php echo($categoryFilter === "hygiène") ? 'selected' : ''; ?>>Hygiène</option>
-                <option value="entretien"
-                  <?php echo($categoryFilter === "entretien") ? 'selected' : ''; ?>>Entretien</option>
-            <option value="logistique"
+                <option value="fournitures"
+                  <?php echo($categoryFilter === "fournitures") ? 'selected' : ''; ?>>Fournitures</option>
+                <option value="équipement"
+                  <?php echo($categoryFilter === "équipement") ? 'selected' : ''; ?>>Equipement</option>
+                <option value="services"
+                  <?php echo($categoryFilter === "services") ? 'selected' : ''; ?>>Services</option>
+                <option value="maintenance"
+                  <?php echo($categoryFilter === "maintenance") ? 'selected' : ''; ?>>Maintenance</option>
+                <option value="logistique"
                   <?php echo($categoryFilter === "logistique") ? 'selected' : ''; ?>>Logistique</option>
-            <option value="mobilité"
-                  <?php echo($categoryFilter === "mobilité") ? 'selected' : ''; ?>>Mobilité</option>
-                </select>
+            </select>
         </div>
 
         <div class="col-md-2">
@@ -108,10 +106,10 @@
           <th>Quantité</th>
           <th>Prix</th>
           <th>Total</th>
-          <th>Client</th>
+          <th>Fournisseur</th>
           <th>Nature</th>
           <th>Catégorie</th>
-          <th>Date Vente</th>
+          <th>Date Dépense</th>
         </tr>
       </thead>
       <tbody>
@@ -126,11 +124,11 @@
                 <td><?php echo htmlspecialchars($row['produit_id']) ?></td>
                 <td><?php echo htmlspecialchars($row['quantity']) ?></td>
                 <td><?php echo htmlspecialchars($row['price']) ?></td>
-                <td><?php echo htmlspecialchars($row['total']) ?></td>
+                <td><?php echo htmlspecialchars($row['amount']) ?></td>
                 <td><?php echo htmlspecialchars($row['customer_id']) ?></td>
                 <td><?php echo htmlspecialchars($row['nature']) ?></td>
                 <td><?php echo htmlspecialchars($row['category']) ?></td>
-                <td><?php echo htmlspecialchars($row['date_recette']) ?></td>
+                <td><?php echo htmlspecialchars($row['date_depense']) ?></td>
             </tr>
         <?php endforeach; ?>
 <?php endif; ?>

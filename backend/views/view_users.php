@@ -1,12 +1,11 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
         header('Location: ../admin_login.php');
         exit;
     }
 
     require_once '../db.php';
-    require_once 'partials/_header.php';
 
     // CSRF token
     if (empty($_SESSION['csrf_token'])) {
@@ -20,19 +19,50 @@
         if (! isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $message = '<div class="alert alert-danger">Erreur de sécurité CSRF.</div>';
         } else {
-            $email    = $_POST['email'] ?? '';
+            $pseudo   = trim($_POST['pseudo'] ?? '');
+            $email    = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
             $role     = $_POST['role'] ?? 'employe';
             $statut   = $_POST['statut'] ?? 'actif';
 
+            if (empty($pseudo) || strlen($pseudo) < 3) {
+                $message = '<div class="alert alert-danger">Le pseudo doit contenir au moins 3 caractères.</div>';
+                return;
+            }
             if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $message = '<div class="alert alert-danger">Email invalide.</div>';
-            } else {
-                $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt          = $pdo->prepare("INSERT INTO users (email, password, role, statut) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$email, $password_hash, $role, $statut]);
-                $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
+                return;
             }
+            if (empty($password) || strlen($password) < 8) {
+                $message = '<div class="alert alert-danger">Mot de passe invalide. Il doit contenir au moins 8 caractères.</div>';
+                return;
+            }
+            if (! in_array($role, ['admin', 'employe'])) {
+                $message = '<div class="alert alert-danger">Erreur serveur réessayer plus tard.</div>';
+                return;
+            }
+
+            // Vérification de l'unicité de l'email
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                $message = '<div class="alert alert-danger">Cet email est déjà utilisé.</div>';
+                return;
+            }
+
+            // Vérification de l'unicité du pseudo
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE pseudo = ?");
+            $stmt->execute([$pseudo]);
+            if ($stmt->fetch()) {
+                $message = '<div class="alert alert-danger">Ce pseudo est déjà utilisé.</div>';
+                return;
+            }
+
+            // Hachage du mot de passe
+            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt          = $pdo->prepare("INSERT INTO users (pseudo, email, password, role, statut) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$pseudo, $email, $password_hash, $role, $statut]);
+            $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
         }
     }
 
@@ -54,7 +84,8 @@
             $message = '<div class="alert alert-danger">Erreur de sécurité CSRF.</div>';
         } else {
             $id     = intval($_POST['id']);
-            $email  = $_POST['email'] ?? '';
+            $pseudo = trim($_POST['pseudo'] ?? '');
+            $email  = trim($_POST['email'] ?? '');
             $role   = $_POST['role'] ?? 'employe';
             $statut = $_POST['statut'] ?? 'actif';
 
@@ -64,11 +95,11 @@
                 // Si le mot de passe est renseigné, on le met à jour
                 if (! empty($_POST['password'])) {
                     $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-                    $stmt          = $pdo->prepare("UPDATE users SET email=?, password=?, role=?, statut=? WHERE id=?");
-                    $stmt->execute([$email, $password_hash, $role, $statut, $id]);
+                    $stmt          = $pdo->prepare("UPDATE users SET pseudo=?, email=?, password=?, role=?, statut=? WHERE id=?");
+                    $stmt->execute([$pseudo, $email, $password_hash, $role, $statut, $id]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET email=?, role=?, statut=? WHERE id=?");
-                    $stmt->execute([$email, $role, $statut, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET pseudo=?, email=?, role=?, statut=? WHERE id=?");
+                    $stmt->execute([$pseudo, $email, $role, $statut, $id]);
                 }
                 $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
             }
@@ -80,6 +111,14 @@
     $statutFilter = $_GET['statut'] ?? '';
     $sortBy       = $_GET['sort_by'] ?? 'email';
     $order        = $_GET['order'] ?? 'ASC';
+
+    // Validation des paramètres de tri
+    $validSortColumns = ['email', 'id', 'statut', 'created_at', 'role'];
+    if (! in_array($sortBy, $validSortColumns)) {
+        $sortBy = 'email'; // Valeur par défaut
+    }
+
+    $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
     // Construction de la requête SQL
     $query  = "SELECT * FROM users WHERE 1=1";
@@ -101,10 +140,13 @@
     $stmt->execute($params);
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-<title>Gestion Utilisateurs</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<?php require_once 'partials/_header.php'; ?>
+  <title>Gestion Utilisateurs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
+ <?php require_once 'partials/_navbar.php'; ?>
 <div class="container my-4">
     <h2 class="mb-4">Gestion des utilisateurs</h2>
     <?php echo $message ?>
@@ -120,28 +162,33 @@
             data-role="employé"
             data-statut="actif"
           >Ajouter un utilisateur</button>
-        </button>
     </div>
     <!-- Formulaire de filtre -->
     <form method="get" class="row g-5 mb-4">
         <div class="col-md-3">
             <select name="role" class="form-select">
                 <option value="">Tous les rôles</option>
-                <option value="admin"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($roleFilter === 'admin') ? 'selected' : ''; ?>>Admin</option>
-                <option value="employe"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($roleFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
+                <option value="admin"
+                    <?php echo($roleFilter === 'admin') ? 'selected' : ''; ?>>Admin</option>
+                <option value="employe"
+                    <?php echo($roleFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="statut" class="form-select">
                 <option value="">Tous les statuts</option>
-                <option value="actif"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statutFilter === 'actif') ? 'selected' : ''; ?>>Actif</option>
-                <option value="désactivé"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statutFilter === 'désactivé') ? 'selected' : ''; ?>>Désactivé</option>
+                <option value="actif"
+                    <?php echo($statutFilter === 'actif') ? 'selected' : ''; ?>>Actif</option>
+                <option value="désactivé"
+                    <?php echo($statutFilter === 'désactivé') ? 'selected' : ''; ?>>Désactivé</option>
             </select>
         </div>
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"
+                    <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"
+                    <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -149,10 +196,12 @@
         </div>
     </form>
 
+<!-- Tableau des utilisateurs -->
     <table class="table table-bordered table-striped">
         <thead>
             <tr>
-                <th>ID</th>
+                <th>#</th>
+                <th>Pseudo</th>
                 <th>Email</th>
                 <th>Rôle</th>
                 <th>Statut</th>
@@ -160,9 +209,18 @@
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($users as $row): ?>
+             <?php if (empty($users)): ?>
                 <tr>
-                    <td><?php echo $row['id'] ?></td>
+                    <td colspan="10" class="text-center">Aucun utilisateur trouvé.</td>
+                </tr>
+            <?php else: ?>
+<?php
+    $i = 1;
+foreach ($users as $row): ?>
+
+                <tr>
+                    <td><?php echo $i++ ?></td>
+                    <td><?php echo htmlspecialchars($row['pseudo']) ?></td>
                     <td><?php echo htmlspecialchars($row['email']) ?></td>
                     <td><?php echo htmlspecialchars($row['role']) ?></td>
                     <td><?php echo htmlspecialchars($row['statut']) ?></td>
@@ -175,6 +233,7 @@
                         data-bs-toggle="modal"
                         data-bs-target="#editUserModal"
                         data-id="<?php echo $row['id'] ?>"
+                        data-pseudo="<?php echo htmlspecialchars($row['pseudo']) ?>"
                         data-email="<?php echo htmlspecialchars($row['email']) ?>"
                         data-role="<?php echo htmlspecialchars($row['role']) ?>"
                         data-statut="<?php echo htmlspecialchars($row['statut']) ?>"
@@ -182,6 +241,7 @@
                     </td>
                 </tr>
             <?php endforeach; ?>
+<?php endif; ?>
         </tbody>
     </table>
 </div>
@@ -197,6 +257,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3">
+                    <label for="add-pseudo" class="form-label">Pseudo</label>
+                    <input type="pseudo" name="pseudo" id="add-pseudo" class="form-control" required>
+                </div>
                 <div class="mb-3">
                     <label for="add-email" class="form-label">Email</label>
                     <input type="email" name="email" id="add-email" class="form-control" required>
@@ -240,6 +304,10 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
+                    <label for="edit-pseudo" class="form-label">Pseudo</label>
+                    <input type="pseudo" name="pseudo" id="edit-pseudo" class="form-control" required>
+                </div>
+                <div class="mb-3">
                     <label for="edit-email" class="form-label">Email</label>
                     <input type="email" name="email" id="edit-email" class="form-control" required>
                 </div>
@@ -277,6 +345,7 @@
     addUserModal.addEventListener('show.bs.modal', function (event) {
         var button = event.relatedTarget;
         document.getElementById('add-id').value = button.getAttribute('data-id');
+        document.getElementById('add-pseudo').value = button.getAttribute('data-pseudo');
         document.getElementById('add-email').value = button.getAttribute('data-email');
         document.getElementById('add-role').value = button.getAttribute('data-role');
         document.getElementById('add-statut').value = button.getAttribute('data-statut');
@@ -288,6 +357,7 @@
     editUserModal.addEventListener('show.bs.modal', function (event) {
         var button = event.relatedTarget;
         document.getElementById('edit-id').value = button.getAttribute('data-id');
+        document.getElementById('edit-pseudo').value = button.getAttribute('data-pseudo');
         document.getElementById('edit-email').value = button.getAttribute('data-email');
         document.getElementById('edit-role').value = button.getAttribute('data-role');
         document.getElementById('edit-statut').value = button.getAttribute('data-statut');

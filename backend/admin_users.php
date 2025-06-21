@@ -1,29 +1,57 @@
 <?php
-session_start();
-if (!isset($_SESSION['admin'])) {
-    header('Location: admin_login.php');
-    exit;
-}
-include 'db.php';
+    session_start();
+    if (! isset($_SESSION['admin'])) {
+        header('Location: admin_login.php');
+        exit;
+    }
+    include 'db.php';
 
-// Ajout d'un utilisateur
-if (isset($_POST['add'])) {
-    $email = $_POST['email'];
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $role = $_POST['role'];
-    $stmt = $conn->prepare("INSERT INTO users (email, password, role) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $email, $password, $role);
+    // Ajout d'un utilisateur
+    if (isset($_POST['add'])) {
+        $email  = $_POST['email'];
+        $pseudo = $_POST['pseudo'];
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            die("Email invalide");
+        }
+        if (empty($_POST['password']) || strlen($_POST['password']) < 8) {
+            die("Mot de passe invalide. Il doit contenir au moins 8 caractères.");
+        }
+        // Vérification de l'unicité de l'email
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);    // Passer $email dans un tableau
+        $result = $stmt->fetchAll(); // Récupérer les résultats
+
+        if (count($result) > 0) {
+            die("Cet email est déjà utilisé.");
+        }
+        // Vérification de l'unicité du pseudo
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE pseudo = ?");
+        $stmt->execute([$pseudo]);   // Passe $pseudo dans un tableau
+        $result = $stmt->fetchAll(); // Récupérer les résultats
+
+        if (count($result) > 0) {
+            die("Cet pseudo est déjà utilisé.");
+        }
+
+        // Hachage du mot de passe
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+        $pseudo   = $_POST['pseudo'];
+        $role     = $_POST['role'];
+        $stmt     = $pdo->prepare("INSERT INTO users (pseudo, email, password, role) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$pseudo, $email, $password, $role]);
+    }
+
+    // Suppression d'un utilisateur
+    if (isset($_GET['delete'])) {
+        $id   = intval($_GET['delete']);
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id=$id");
+        $stmt->execute([$id]);
+    }
+
+    // Liste des utilisateurs
+    $stmt = $pdo->prepare("SELECT * FROM users");
     $stmt->execute();
-}
-
-// Suppression d'un utilisateur
-if (isset($_GET['delete'])) {
-    $id = intval($_GET['delete']);
-    $conn->query("DELETE FROM users WHERE id=$id");
-}
-
-// Liste des utilisateurs
-$result = $conn->query("SELECT * FROM users");
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -78,7 +106,7 @@ $result = $conn->query("SELECT * FROM users");
                <option value="employe" selected>Employé</option>
             </select>
          </div>
-         <div class="col-md-2 d-flex justify-content-center 
+         <div class="col-md-2 d-flex justify-content-center
                align-items-end">
             <button type="submit" name="add" class="
                btn btn-outline-success  w-100">Ajouter
@@ -86,18 +114,29 @@ $result = $conn->query("SELECT * FROM users");
          </div>
       </form>
       <table class="table table-bordered table-striped">
-         <tr><th>ID</th><th>Email</th><th>Rôle</th><th>Statut</th><th>Action</th></tr>
-         <?php while ($row = $result->fetch_assoc()): ?>
+         <thead>
+            <tr><th>ID</th><th>Pseudo</th><th>Email</th><th>Rôle</th><th>Statut</th><th>Action</th></tr>
+         </thead>
+         <tbody>
+         <?php if (empty($users)): ?>
+              <tr>
+                  <td colspan="10" class="text-center">Aucun utilisateur trouvé.</td>
+              </tr>
+          <?php else: ?>
+<?php foreach ($users as $row): ?>
                <tr>
-                  <td><?= $row['id'] ?></td>
-                  <td><?= htmlspecialchars($row['email']) ?></td>
-                  <td><?= htmlspecialchars($row['role']) ?></td>
-                  <td><?= htmlspecialchars($row['statut']) ?></td>
+                  <td><?php echo $row['id'] ?></td>
+                  <td><?php echo htmlspecialchars($row['pseudo']) ?></td>
+                  <td><?php echo htmlspecialchars($row['email']) ?></td>
+                  <td><?php echo htmlspecialchars($row['role']) ?></td>
+                  <td><?php echo htmlspecialchars($row['statut']) ?></td>
                   <td>
-                     <a href="?delete=<?= $row['id'] ?>" class="btn btn-outline-danger" onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer</a>
+                     <a href="?delete=<?php echo $row['id'] ?>" class="btn btn-outline-danger" onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer</a>
                   </td>
                </tr>
-         <?php endwhile; ?>
+        <?php endforeach; ?>
+<?php endif; ?>
+      </tbody>
       </table>
       <br>
    </main>

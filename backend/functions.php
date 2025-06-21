@@ -39,20 +39,61 @@ function getTotal($table)
 function getRecettesTotal()
 {
     global $pdo;
-    $stmt = $pdo->query("SELECT SUM(total) FROM recettes");
-    return number_format($stmt->fetchColumn(), 2);
+    $stmt  = $pdo->query("SELECT SUM(total) FROM recettes");
+    $total = $stmt->fetchColumn();
+
+    // Vérification si le total est null ou non numérique
+    $total = is_null($total) ? 0 : $total;
+
+    return number_format($total, 1);
+}
+
+function getDepensesTotal()
+{
+    global $pdo;
+    $stmt  = $pdo->query("SELECT SUM(total) FROM depenses");
+    $total = $stmt->fetchColumn();
+
+    // Vérification si le total est null ou non numérique
+    $total = is_null($total) ? 0 : $total;
+
+    return number_format($total, 1);
 }
 
 function getPaymentsTotal()
 {
     global $pdo;
-    $stmt = $pdo->query("SELECT SUM(amount) FROM payments");
-    return number_format($stmt->fetchColumn(), 2);
+    $stmt  = $pdo->query("SELECT SUM(amount) FROM payments");
+    $total = $stmt->fetchColumn();
+
+    // Vérification si le total est null ou non numérique
+    $total = is_null($total) ? 0 : $total;
+
+    return number_format($total, 1);
+}
+
+function getAchatsTotal()
+{
+    global $pdo;
+    $stmt  = $pdo->query("SELECT SUM(amount) FROM achats");
+    $total = $stmt->fetchColumn();
+
+    // Vérification si le total est null ou non numérique
+    $total = is_null($total) ? 0 : $total;
+
+    return number_format($total, 1);
 }
 
 function getMonthlyRecettes()
 {
     global $pdo;
-    $stmt = $pdo->query("SELECT DATE_FORMAT(date, '%Y-%m') AS month, SUM(total) AS total FROM recettes GROUP BY month ORDER BY month");
+    $stmt = $pdo->query("SELECT DATE_FORMAT(date_recette, '%Y-%m') AS month, SUM(total) AS total FROM recettes GROUP BY month ORDER BY month");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function getMonthlyDepenses()
+{
+    global $pdo;
+    $stmt = $pdo->query("SELECT DATE_FORMAT(date_depense, '%Y-%m') AS month, SUM(total) AS total FROM depenses GROUP BY month ORDER BY month");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
