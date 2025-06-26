@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -29,65 +29,77 @@
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
+    // Validation des filtres
+    $validTypes    = ['client', 'fournisseur', 'employe'];
+    $validStatuses = ['en cours', 'terminé', 'annulé'];
+
     // Construction de la requête SQL
     $query  = "SELECT * FROM contrats WHERE 1=1";
     $params = [];
 
-    if ($typeFilter) {
+    if ($typeFilter && in_array($typeFilter, $validTypes)) {
         $query .= " AND type = ?";
         $params[] = $typeFilter;
     }
 
-    if ($statusFilter) {
+    if ($statusFilter && in_array($statusFilter, $validStatuses)) {
         $query .= " AND status = ?";
         $params[] = $statusFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $contrats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $contrats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des contrats.</div>';
+    }
+
+    // Affichage du titre et du CSS
 ?>
 <title>Gestion Contrats</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
+<?php require_once 'partials/_navbar.php'; ?>
 <div class="container my-4">
     <h2>Liste des contrats</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row g-5 mb-4 mt-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
         <div class="col-md-3">
             <select name="type" class="form-select">
                 <option value="">Tous les types</option>
                 <option value="client"
-                  <?php echo($typeFilter === 'client') ? 'selected' : ''; ?>>Client</option>
+                    <?php echo($typeFilter === 'client') ? 'selected' : ''; ?>>Client</option>
                 <option value="fournisseur"
-                  <?php echo($typeFilter === 'fournisseur') ? 'selected' : ''; ?>>Fournisseur</option>
+                    <?php echo($typeFilter === 'fournisseur') ? 'selected' : ''; ?>>Fournisseur</option>
                 <option value="employe"
-                  <?php echo($typeFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
+                    <?php echo($typeFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="status" class="form-select">
                 <option value="">Tous les statuts</option>
                 <option value="en cours"
-                  <?php echo($statusFilter === "en cours") ? 'selected' : ''; ?>>En cours</option>
+                    <?php echo($statusFilter === "en cours") ? 'selected' : ''; ?>>En cours</option>
                 <option value="terminé"
-                  <?php echo($statusFilter === 'terminé') ? 'selected' : ''; ?>>Terminé</option>
+                    <?php echo($statusFilter === 'terminé') ? 'selected' : ''; ?>>Terminé</option>
                 <option value="annulé"
-                  <?php echo($statusFilter === 'annulé') ? 'selected' : ''; ?>>Annulé</option>
+                    <?php echo($statusFilter === 'annulé') ? 'selected' : ''; ?>>Annulé</option>
             </select>
         </div>
 
         <div class="col-md-2">
             <select name="order" class="form-select">
                 <option value="ASC"
-                  <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                    <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
                 <option value="DESC"
-                  <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                    <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -96,6 +108,7 @@
     </form>
 
     <!-- Tableau des contrats -->
+     <div class="bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
@@ -104,9 +117,8 @@
                 <th>Objet</th>
                 <th>Date début</th>
                 <th>Date fin</th>
-                <th>Status</th>
+                <th>Statut</th>
                 <th>Montant</th>
-                <th>Signataire</th>
                 <th>Signé le</th>
                 <th>Type</th>
             </tr>
@@ -126,7 +138,6 @@
                         <td><?php echo htmlspecialchars($row['date_fin']) ?></td>
                         <td><?php echo htmlspecialchars($row['status']) ?></td>
                         <td><?php echo htmlspecialchars($row['montant']) ?></td>
-                        <td><?php echo htmlspecialchars($row['signataire']) ?></td>
                         <td><?php echo htmlspecialchars($row['date_signature']) ?></td>
                         <td><?php echo htmlspecialchars($row['type']) ?></td>
                     </tr>
@@ -134,6 +145,7 @@
 <?php endif; ?>
         </tbody>
     </table>
+</div>
 </div>
 <?php
     require_once 'partials/_footer.php';

@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -15,7 +15,7 @@
 
     $message = '';
 
-    // Filtrage et tri des clients
+    // Filtrage et tri des recettes
     $natureFilter   = $_GET['nature'] ?? '';
     $categoryFilter = $_GET['category'] ?? '';
     $sortBy         = $_GET['sort_by'] ?? 'produit_id';
@@ -29,69 +29,71 @@
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
+    // Validation des filtres
+    $validNatures    = ['vente', 'location'];
+    $validCategories = ['construction', 'sécurité', 'hygiène', 'entretien', 'logistique', 'mobilité'];
+
     // Construction de la requête SQL
     $query  = "SELECT * FROM recettes WHERE 1=1";
     $params = [];
 
-    if ($natureFilter) {
+    if ($natureFilter && in_array($natureFilter, $validNatures)) {
         $query .= " AND nature = ?";
         $params[] = $natureFilter;
     }
 
-    if ($categoryFilter) {
+    if ($categoryFilter && in_array($categoryFilter, $validCategories)) {
         $query .= " AND category = ?";
         $params[] = $categoryFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $recettes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $recettes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des recettes.</div>';
+    }
+
+    // Affichage du titre et du CSS
 ?>
-  <title>Gestion Recettes</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
+<title>Gestion des Recettes</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
-  <div class="container my-4">
+<?php require_once 'partials/_navbar.php'; ?>
+<div class="container my-4">
     <h2>Liste des recettes</h2>
-        <?php echo $message ?>
+    <?php echo $message ?>
 
-     <!-- Formulaire de filtre -->
-      <form method="get" class="row g-5 mb-4 mt-3">
+    <!-- Formulaire de filtre -->
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
         <div class="col-md-3">
             <select name="nature" class="form-select">
                 <option value="">Toutes les natures</option>
-                <option value="vente"
-                  <?php echo($natureFilter === "vente") ? 'selected' : ''; ?>>Vente</option>
-                <option value="location"
-                  <?php echo($natureFilter === "location") ? 'selected' : ''; ?>>Location</option>
+                <option value="vente"                                                                                                                                                                                                                                                                                                                                              <?php echo($natureFilter === "vente") ? 'selected' : ''; ?>>Vente</option>
+                <option value="location"                                                                                                                                                                                                                                                                                                                                                                         <?php echo($natureFilter === "location") ? 'selected' : ''; ?>>Location</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="category" class="form-select">
                 <option value="">Toutes les catégories</option>
-                <option value="construction"
-                  <?php echo($categoryFilter === "construction") ? 'selected' : ''; ?>>Construction</option>
-                <option value="sécurité"
-                  <?php echo($categoryFilter === "sécurité") ? 'selected' : ''; ?>>Sécurité</option>
-                <option value="hygiène"
-                  <?php echo($categoryFilter === "hygiène") ? 'selected' : ''; ?>>Hygiène</option>
-                <option value="entretien"
-                  <?php echo($categoryFilter === "entretien") ? 'selected' : ''; ?>>Entretien</option>
-            <option value="logistique"
-                  <?php echo($categoryFilter === "logistique") ? 'selected' : ''; ?>>Logistique</option>
-            <option value="mobilité"
-                  <?php echo($categoryFilter === "mobilité") ? 'selected' : ''; ?>>Mobilité</option>
-                </select>
+                <option value="construction"                                                                                                                                                                                                                                                                                                                                                                                                             <?php echo($categoryFilter === "construction") ? 'selected' : ''; ?>>Construction</option>
+                <option value="sécurité"                                                                                                                                                                                                                                                                                                                                                                                           <?php echo($categoryFilter === "sécurité") ? 'selected' : ''; ?>>Sécurité</option>
+                <option value="hygiène"                                                                                                                                                                                                                                                                                                                                                                         <?php echo($categoryFilter === "hygiène") ? 'selected' : ''; ?>>Hygiène</option>
+                <option value="entretien"                                                                                                                                                                                                                                                                                                                                                                                  <?php echo($categoryFilter === "entretien") ? 'selected' : ''; ?>>Entretien</option>
+                <option value="logistique"                                                                                                                                                                                                                                                                                                                                                                                           <?php echo($categoryFilter === "logistique") ? 'selected' : ''; ?>>Logistique</option>
+                <option value="mobilité"                                                                                                                                                                                                                                                                                                                                                                                  <?php echo($categoryFilter === "mobilité") ? 'selected' : ''; ?>>Mobilité</option>
+            </select>
         </div>
 
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"
-                  <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"
-                  <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                                                                                                                                                            <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                                                                                                                                                                     <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -99,44 +101,46 @@
         </div>
     </form>
 
-    <!-- Tableau des clients -->
+    <!-- Tableau des recettes -->
+    <div class="bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Produit</th>
-          <th>Quantité</th>
-          <th>Prix</th>
-          <th>Total</th>
-          <th>Client</th>
-          <th>Nature</th>
-          <th>Catégorie</th>
-          <th>Date Vente</th>
-        </tr>
-      </thead>
-      <tbody>
-          <?php if (empty($recettes)): ?>
-              <tr>
-                  <td colspan="10" class="text-center">Aucune recette trouvée.</td>
-              </tr>
-          <?php else: ?>
-<?php foreach ($recettes as $row): ?>
+        <thead>
             <tr>
-                <td><?php echo htmlspecialchars($row['id']) ?></td>
-                <td><?php echo htmlspecialchars($row['produit_id']) ?></td>
-                <td><?php echo htmlspecialchars($row['quantity']) ?></td>
-                <td><?php echo htmlspecialchars($row['price']) ?></td>
-                <td><?php echo htmlspecialchars($row['total']) ?></td>
-                <td><?php echo htmlspecialchars($row['customer_id']) ?></td>
-                <td><?php echo htmlspecialchars($row['nature']) ?></td>
-                <td><?php echo htmlspecialchars($row['category']) ?></td>
-                <td><?php echo htmlspecialchars($row['date_recette']) ?></td>
+                <th>ID</th>
+                <th>Produit</th>
+                <th>Quantité</th>
+                <th>Prix</th>
+                <th>Total</th>
+                <th>Client</th>
+                <th>Nature</th>
+                <th>Catégorie</th>
+                <th>Date Vente</th>
             </tr>
-        <?php endforeach; ?>
+        </thead>
+        <tbody>
+            <?php if (empty($recettes)): ?>
+                <tr>
+                    <td colspan="9" class="text-center">Aucune recette trouvée.</td>
+                </tr>
+            <?php else: ?>
+<?php foreach ($recettes as $row): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['produit_id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['quantity']) ?></td>
+                        <td><?php echo htmlspecialchars($row['price']) ?></td>
+                        <td><?php echo htmlspecialchars($row['total']) ?></td>
+                        <td><?php echo htmlspecialchars($row['customer_id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['nature']) ?></td>
+                        <td><?php echo htmlspecialchars($row['category']) ?></td>
+                        <td><?php echo htmlspecialchars($row['date_recette']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
 <?php endif; ?>
-      </tbody>
+        </tbody>
     </table>
-  </div>
+</div>
+</div>
 <?php
-require_once 'partials/_footer.php';
+    require_once 'partials/_footer.php';
 ?>

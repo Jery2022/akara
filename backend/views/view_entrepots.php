@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -15,7 +15,7 @@
 
     $message = '';
 
-    // Filtrage et tri des clients
+    // Filtrage et tri des entrepôts
     $quality_stockageFilter = $_GET['quality_stockage'] ?? '';
     $black_listFilter       = $_GET['black_list'] ?? '';
     $sortBy                 = $_GET['sort_by'] ?? 'name';
@@ -29,39 +29,51 @@
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
+    // Validation des filtres
+    $validBlackList       = ['oui', 'non'];
+    $validQualityStockage = ['bonne', 'moyenne', 'mauvaise'];
+
     // Construction de la requête SQL
     $query  = "SELECT * FROM entrepots WHERE 1=1";
     $params = [];
 
-    if ($black_listFilter) {
+    if ($black_listFilter && in_array($black_listFilter, $validBlackList)) {
         $query .= " AND black_list = ?";
         $params[] = $black_listFilter;
     }
 
-    if ($quality_stockageFilter) {
+    if ($quality_stockageFilter && in_array($quality_stockageFilter, $validQualityStockage)) {
         $query .= " AND quality_stockage = ?";
         $params[] = $quality_stockageFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $entrepots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $entrepots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des entrepôts.</div>';
+    }
+
+    // Affichage du titre et du CSS
 ?>
-  <title>Gestion Entrpôts</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
+<title>Gestion Entrepôts</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
-  <div class="container my-4">
+<?php require_once 'partials/_navbar.php'; ?>
+<div class="container my-4">
     <h2>Liste des entrepôts</h2>
     <?php echo $message ?>
 
-     <!-- Formulaire de filtre -->
-      <form method="get" class="row g-5 mb-4 mt-3">
+    <!-- Formulaire de filtre -->
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
         <div class="col-md-3">
             <select name="black_list" class="form-select">
-                <option value="">Tous les black-listés</option>
+                <option value="">Tous les black-listés ou non</option>
                 <option value="oui"
                   <?php echo($black_listFilter === "oui") ? 'selected' : ''; ?>>Oui</option>
                 <option value="non"
@@ -70,7 +82,7 @@
         </div>
         <div class="col-md-3">
             <select name="quality_stockage" class="form-select">
-                <option value="">Toutes les qualités</option>
+                <option value="">Toutes les qualités de stockage</option>
                 <option value="bonne"
                   <?php echo($quality_stockageFilter === "bonne") ? 'selected' : ''; ?>>Bonne</option>
                 <option value="moyenne"
@@ -94,43 +106,45 @@
     </form>
 
     <!-- Tableau des entrepôts -->
+<div class="bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Nom</th>
-          <th>Adresse</th>
-          <th>Responsable</th>
-          <th>Email</th>
-          <th>Téléphone</th>
-          <th>Capacité</th>
-          <th>Stockage</th>
-          <th>Bannis</th>
-        </tr>
-      </thead>
-      <tbody>
-          <?php if (empty($entrepots)): ?>
-              <tr>
-                  <td colspan="10" class="text-center">Aucun client trouvé.</td>
-              </tr>
-          <?php else: ?>
-<?php foreach ($entrepots as $row): ?>
-              <tr>
-                  <td><?php echo htmlspecialchars($row['id']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['name']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['adresse']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['responsable']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['email']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['telephone']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['capacity']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['quality_stockage']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['black_list']) ?> </td>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nom</th>
+                <th>Adresse</th>
+                <th>Responsable</th>
+                <th>E-mail</th>
+                <th>Téléphone</th>
+                <th>Capacité</th>
+                <th>Stockage</th>
+                <th>Bannis</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($entrepots)): ?>
+                <tr>
+                    <td colspan="9" class="text-center">Aucun entrepôt trouvé.</td>
                 </tr>
-        <?php endforeach; ?>
+            <?php else: ?>
+<?php foreach ($entrepots as $row): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['id']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['name']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['adresse']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['responsable']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['email']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['telephone']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['capacity']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['quality_stockage']) ?> </td>
+                        <td><?php echo htmlspecialchars($row['black_list']) ?> </td>
+                    </tr>
+                <?php endforeach; ?>
 <?php endif; ?>
-      </tbody>
+        </tbody>
     </table>
-  </div>
+</div>
+</div>
 <?php
-require_once 'partials/_footer.php';
+    require_once 'partials/_footer.php';
 ?>

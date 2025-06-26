@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -15,50 +15,62 @@
 
     $message = '';
 
-    // Filtrage et tri des clients
+    // Filtrage et tri des produits
     $provenanceFilter    = $_GET['provenance'] ?? '';
     $disponibilityFilter = $_GET['disponibility'] ?? '';
     $sortBy              = $_GET['sort_by'] ?? 'name';
     $order               = $_GET['order'] ?? 'ASC';
 
     // Validation des paramètres de tri
-    $validSortColumns = ['id', 'name', 'created_at', 'price', 'supplier_id', 'entrepot_id '];
+    $validSortColumns = ['id', 'name', 'created_at', 'price', 'supplier_id', 'entrepot_id'];
     if (! in_array($sortBy, $validSortColumns)) {
         $sortBy = 'name'; // Valeur par défaut
     }
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
+    // Validation des filtres
+    $validProvenances     = ['local', 'etranger'];
+    $validDisponibilities = ['oui', 'non'];
+
     // Construction de la requête SQL
     $query  = "SELECT * FROM produits WHERE 1=1";
     $params = [];
 
-    if ($provenanceFilter) {
+    if ($provenanceFilter && in_array($provenanceFilter, $validProvenances)) {
         $query .= " AND provenance = ?";
         $params[] = $provenanceFilter;
     }
 
-    if ($disponibilityFilter) {
+    if ($disponibilityFilter && in_array($disponibilityFilter, $validDisponibilities)) {
         $query .= " AND disponibility = ?";
         $params[] = $disponibilityFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des produits.</div>';
+    }
+
+    // Affichage du titre et du CSS
 ?>
-  <title>Gestion Produits</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
+<title>Gestion Produits</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
-  <div class="container my-4">
+<?php require_once 'partials/_navbar.php'; ?>
+<div class="container my-4">
     <h2>Liste des produits</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-      <form method="get" class="row g-5 mb-4 mt-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
         <div class="col-md-3">
             <select name="provenance" class="form-select">
                 <option value="">Toutes les provenances</option>
@@ -91,43 +103,46 @@
         </div>
     </form>
 
-    <!-- Tableau des clients -->
+    <!-- Tableau des produits -->
+    <div class="bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
-      <thead>
+        <thead>
         <tr>
-          <th>ID</th>
-          <th>Nom</th>
-          <th>Description</th>
-          <th>Unité</th>
-          <th>Prix</th>
-          <th>Provenance</th>
-          <th>Disponible</th>
-          <th>Délai</th>
-          <th>Catégorie</th>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>Description</th>
+            <th>Unité</th>
+            <th>Prix</th>
+            <th>Provenance</th>
+            <th>Disponible</th>
+            <th>Délai</th>
+            <th>Catégorie</th>
         </tr>
-      </thead>
-      <tbody>
-                  <?php if (empty($produits)): ?>
-              <tr>
-                  <td colspan="10" class="text-center">Aucun client trouvé.</td>
-              </tr>
-          <?php else: ?>
+        </thead>
+        <tbody>
+        <?php if (empty($produits)): ?>
+            <tr>
+                <td colspan="9" class="text-center">Aucun produit trouvé.</td>
+            </tr>
+        <?php else: ?>
 <?php foreach ($produits as $row): ?>
-          <tr>
-            <td><?php echo htmlspecialchars($row['id']); ?></td>
-            <td><?php echo htmlspecialchars($row['name']); ?></td>
-            <td><?php echo htmlspecialchars($row['description']); ?></td>
-            <td><?php echo htmlspecialchars($row['unit']); ?></td>
-            <td><?php echo htmlspecialchars($row['price']); ?></td>
-            <td><?php echo htmlspecialchars($row['provenance']); ?></td>
-            <td><?php echo htmlspecialchars($row['disponibility']); ?></td>
-            <td><?php echo htmlspecialchars($row['category']); ?></td>
-          </tr>
-        <?php endforeach; ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($row['id']); ?></td>
+                    <td><?php echo htmlspecialchars($row['name']); ?></td>
+                    <td><?php echo htmlspecialchars($row['description']); ?></td>
+                    <td><?php echo htmlspecialchars($row['unit']); ?></td>
+                    <td><?php echo htmlspecialchars($row['price']); ?></td>
+                    <td><?php echo htmlspecialchars($row['provenance']); ?></td>
+                    <td><?php echo htmlspecialchars($row['disponibility']); ?></td>
+                    <td><?php echo htmlspecialchars($row['delai_livraison']); ?></td>
+                    <td><?php echo htmlspecialchars($row['category']); ?></td>
+                </tr>
+            <?php endforeach; ?>
 <?php endif; ?>
-      </tbody>
+        </tbody>
     </table>
-  </div>
+</div>
+</div>
 <?php
-require_once 'partials/_footer.php';
+    require_once 'partials/_footer.php';
 ?>

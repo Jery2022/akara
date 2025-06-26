@@ -148,7 +148,7 @@
           <canvas id="statChart" height="100"></canvas>
         </div>
       </div>
-      <div class="col-xl-12 col-md-6 shadow-sm mb-4">
+      <div class="col-xl-12 col-md-6 shadow-sm mb-4 mt-4">
         <div class="card-body">
           <h5 class="card-title">Graphique des recettes vs dépenses mensuelles</h5>
           <canvas id="AutreStatChart" height="100"></canvas>
@@ -188,18 +188,18 @@
   const chart = new Chart(ctx2, {
     type: 'bar',
     data: {
-      labels:                                                                  <?php echo json_encode($labels); ?>,
+      labels:                                                                                            <?php echo json_encode($labels); ?>,
       datasets: [
         {
           label: 'Recettes',
-          data:                                                                            <?php echo json_encode($recetteData); ?>,
+          data:                                                                                                          <?php echo json_encode($recetteData); ?>,
           backgroundColor: 'rgba(25, 135, 84, 0.6)',
           borderRadius: 6,
           borderSkipped: false
         },
         {
           label: 'Dépenses',
-          data:                                                                            <?php echo json_encode($paymentData); ?>,
+          data:                                                                                                          <?php echo json_encode($paymentData); ?>,
           type: 'line',
           borderColor: '#dc3545',
           backgroundColor: 'rgba(220, 53, 69, 0.1)',

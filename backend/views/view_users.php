@@ -152,7 +152,7 @@
     <?php echo $message ?>
 
     <!-- Bouton pour ajouter un utilisateur -->
-    <div class="mb-3">
+    <div class="mb-3 mt-5">
         <button
             class="btn btn-primary btn-md"
             data-bs-toggle="modal"
@@ -164,7 +164,7 @@
           >Ajouter un utilisateur</button>
     </div>
     <!-- Formulaire de filtre -->
-    <form method="get" class="row g-5 mb-4">
+    <form method="get" class="row mb-5 mt-3 bg-dark-subtle shadow p-3">
         <div class="col-md-3">
             <select name="role" class="form-select">
                 <option value="">Tous les rôles</option>
@@ -197,6 +197,7 @@
     </form>
 
 <!-- Tableau des utilisateurs -->
+ <div class="bg-dark-subtle shadow p-3">
     <table class="table table-bordered table-striped">
         <thead>
             <tr>
@@ -244,6 +245,7 @@ foreach ($users as $row): ?>
 <?php endif; ?>
         </tbody>
     </table>
+</div>
 </div>
 
 <!-- Modal d'ajout d'un utilisateur -->

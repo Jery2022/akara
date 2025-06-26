@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -24,41 +24,52 @@
     // Validation des paramètres de tri
     $validSortColumns = ['id', 'contrat_id', 'user_id', 'customer_id', 'amount'];
     if (! in_array($sortBy, $validSortColumns)) {
-        $sortBy = 'customers_id'; // Valeur par défaut
+        $sortBy = 'customer_id'; // Valeur par défaut
     }
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
+
+    // Validation des filtres
+    $validTypes      = ['virement', 'chèque', 'espèces'];
+    $validCategories = ['travaux', 'services'];
 
     // Construction de la requête SQL
     $query  = "SELECT * FROM payments WHERE 1=1";
     $params = [];
 
-    if ($typeFilter) {
+    if ($typeFilter && in_array($typeFilter, $validTypes)) {
         $query .= " AND type = ?";
         $params[] = $typeFilter;
     }
 
-    if ($categoryFilter) {
+    if ($categoryFilter && in_array($categoryFilter, $validCategories)) {
         $query .= " AND category = ?";
         $params[] = $categoryFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des paiements.</div>';
+    }
+
 ?>
-  <title>Gestion Paiements</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
+<title>Gestion des Paiements</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
-  <div class="container my-4">
+<?php require_once 'partials/_navbar.php'; ?>
+<div class="container my-4">
     <h2>Liste des paiements</h2>
-           <?php echo $message ?>
+    <?php echo $message ?>
 
-     <!-- Formulaire de filtre -->
-      <form method="get" class="row g-5 mb-4 mt-3">
+    <!-- Formulaire de filtre -->
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3" >
         <div class="col-md-3">
             <select name="type" class="form-select">
                 <option value="">Tous les types</option>
@@ -94,41 +105,43 @@
     </form>
 
     <!-- Tableau des paiements -->
+    <div class="bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Contrat</th>
-          <th>Reçu par</th>
-          <th>Client</th>
-          <th>Montant</th>
-          <th>Type</th>
-          <th>Catégorie</th>
-          <th>Date paiement</th>
-        </tr>
-      </thead>
-      <tbody>
-          <?php if (empty($payments)): ?>
-              <tr>
-                  <td colspan="10" class="text-center">Aucun paiement trouvé.</td>
-              </tr>
-          <?php else: ?>
-<?php foreach ($payments as $row): ?>
+        <thead>
             <tr>
-                  <td><?php echo htmlspecialchars($row['id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['contrat_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['user_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['customer_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['amount']) ?></td>
-                  <td><?php echo htmlspecialchars($row['type']) ?></td>
-                  <td><?php echo htmlspecialchars($row['category']) ?></td>
-                  <td><?php echo htmlspecialchars($row['date_payment']) ?></td>
+                <th>ID</th>
+                <th>Contrat</th>
+                <th>Reçu par</th>
+                <th>Client</th>
+                <th>Montant</th>
+                <th>Type</th>
+                <th>Catégorie</th>
+                <th>Date paiement</th>
             </tr>
-        <?php endforeach; ?>
+        </thead>
+        <tbody>
+            <?php if (empty($payments)): ?>
+                <tr>
+                    <td colspan="8" class="text-center">Aucun paiement trouvé.</td>
+                </tr>
+            <?php else: ?>
+<?php foreach ($payments as $row): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['contrat_id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['user_id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['customer_id']) ?></td>
+                        <td><?php echo htmlspecialchars($row['amount']) ?></td>
+                        <td><?php echo htmlspecialchars($row['type']) ?></td>
+                        <td><?php echo htmlspecialchars($row['category']) ?></td>
+                        <td><?php echo htmlspecialchars($row['date_payment']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
 <?php endif; ?>
-      </tbody>
+        </tbody>
     </table>
-  </div>
+</div>
+</div>
 <?php
-require_once 'partials/_footer.php';
+    require_once 'partials/_footer.php';
 ?>

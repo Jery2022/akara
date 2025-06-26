@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -15,7 +15,7 @@
 
     $message = '';
 
-    // Filtrage et tri des clients
+    // Filtrage et tri des employés
     $statusFilter  = $_GET['status'] ?? '';
     $qualityFilter = $_GET['quality'] ?? '';
     $sortBy        = $_GET['sort_by'] ?? 'name';
@@ -29,67 +29,68 @@
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
 
+    // Validation des filtres
+    $validStatuses  = ['actif', 'inactif'];
+    $validQualities = ['ouvrier', 'technicien', 'ingenieur', 'ceo'];
+
     // Construction de la requête SQL
     $query  = "SELECT * FROM employees WHERE 1=1";
     $params = [];
 
-    if ($qualityFilter) {
+    if ($qualityFilter && in_array($qualityFilter, $validQualities)) {
         $query .= " AND quality = ?";
         $params[] = $qualityFilter;
     }
 
-    if ($statusFilter) {
+    if ($statusFilter && in_array($statusFilter, $validStatuses)) {
         $query .= " AND status = ?";
         $params[] = $statusFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des employés.</div>';
+    }
+
+    // Affichage du titre et du CSS
 ?>
-  <title>Gestion Employés</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
+<title>Gestion Employés</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-  <div class="container my-4">
+  <?php require_once 'partials/_navbar.php'; ?>
+<div class="container my-4">
     <h2>Liste des employés</h2>
     <?php echo $message ?>
 
-
-     <!-- Formulaire de filtre -->
-      <form method="get" class="row g-5 mb-4 mt-3">
+    <!-- Formulaire de filtre -->
+    <form method="get" class="row g-5 mb-4 mt-3">
         <div class="col-md-3">
             <select name="quality" class="form-select">
                 <option value="">Toutes les qualifications</option>
-                <option value="ouvrier"
-                  <?php echo($qualityFilter === "ouvrier") ? 'selected' : ''; ?>>Ouvrier</option>
-                <option value="technicien"
-                  <?php echo($qualityFilter === "technicien") ? 'selected' : ''; ?>>Technicien</option>
-            <option value="ingenieur"
-                  <?php echo($qualityFilter === "ingenieur") ? 'selected' : ''; ?>>Ingénieur</option>
-            <option value="ceo"
-                  <?php echo($qualityFilter === "ceo") ? 'selected' : ''; ?>>CEO</option>
-
-                </select>
+                <option value="ouvrier"                                                                               <?php echo($qualityFilter === "ouvrier") ? 'selected' : ''; ?>>Ouvrier</option>
+                <option value="technicien"                                                                                     <?php echo($qualityFilter === "technicien") ? 'selected' : ''; ?>>Technicien</option>
+                <option value="ingenieur"                                                                                   <?php echo($qualityFilter === "ingenieur") ? 'selected' : ''; ?>>Ingénieur</option>
+                <option value="ceo"                                                                       <?php echo($qualityFilter === "ceo") ? 'selected' : ''; ?>>CEO</option>
+            </select>
         </div>
         <div class="col-md-3">
             <select name="status" class="form-select">
                 <option value="">Tous les statuts</option>
-                <option value="actif"
-                  <?php echo($statusFilter === "actif") ? 'selected' : ''; ?>>Actif</option>
-                <option value="inactif"
-                  <?php echo($statusFilter === "inactif") ? 'selected' : ''; ?>>Inactif</option>
+                <option value="actif"                                                                           <?php echo($statusFilter === "actif") ? 'selected' : ''; ?>>Actif</option>
+                <option value="inactif"                                                                               <?php echo($statusFilter === "inactif") ? 'selected' : ''; ?>>Inactif</option>
             </select>
         </div>
 
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"
-                  <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"
-                  <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                       <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                         <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -99,42 +100,42 @@
 
     <!-- Tableau des employés -->
     <table class="table table-striped table-hover">
-      <thead>
+        <thead>
         <tr>
-          <th>ID</th>
-          <th>Nom</th>
-          <th>Fonction</th>
-          <th>Salaire</th>
-          <th>Téléphone</th>
-          <th>Email</th>
-          <th>Statut</th>
-          <th>Qualité</th>
-          <th>ID Contrat</th>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>Fonction</th>
+            <th>Salaire</th>
+            <th>Téléphone</th>
+            <th>Email</th>
+            <th>Statut</th>
+            <th>Qualité</th>
+            <th>ID Contrat</th>
         </tr>
-      </thead>
-      <tbody>
+        </thead>
+        <tbody>
         <?php if (empty($employees)): ?>
-              <tr>
-                  <td colspan="10" class="text-center">Aucun client trouvé.</td>
-              </tr>
-          <?php else: ?>
+            <tr>
+                <td colspan="9" class="text-center">Aucun employé trouvé.</td>
+            </tr>
+        <?php else: ?>
 <?php foreach ($employees as $row): ?>
-              <tr>
-                  <td><?php echo htmlspecialchars($row['id']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['name']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['fonction']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['salary']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['phone']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['email']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['status']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['quality']) ?> </td>
-                  <td><?php echo htmlspecialchars($row['contrat_id'] || '') ?> </td>
-              </tr>
-               <?php endforeach; ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($row['id']) ?></td>
+                    <td><?php echo htmlspecialchars($row['name']) ?></td>
+                    <td><?php echo htmlspecialchars($row['fonction']) ?></td>
+                    <td><?php echo htmlspecialchars($row['salary']) ?></td>
+                    <td><?php echo htmlspecialchars($row['phone']) ?></td>
+                    <td><?php echo htmlspecialchars($row['email']) ?></td>
+                    <td><?php echo htmlspecialchars($row['status']) ?></td>
+                    <td><?php echo htmlspecialchars($row['quality']) ?></td>
+                    <td><?php echo htmlspecialchars($row['contrat_id'] ?? '') ?></td>
+                </tr>
+            <?php endforeach; ?>
 <?php endif; ?>
-      </tbody>
+        </tbody>
     </table>
-  </div>
+</div>
 <?php
-require_once 'partials/_footer.php';
+    require_once 'partials/_footer.php';
 ?>

@@ -97,3 +97,44 @@ function getMonthlyDepenses()
     $stmt = $pdo->query("SELECT DATE_FORMAT(date_depense, '%Y-%m') AS month, SUM(total) AS total FROM depenses GROUP BY month ORDER BY month");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+function getDetailsFactures($id)
+{
+    global $pdo;
+
+    if (! intval($id) || $id === '') {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération de votre facture.</div>';
+        return [];
+    } else {
+        $sql = "SELECT * FROM details_facture WHERE facture_id = ?";
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            $message = '<div class="alert alert-danger">Erreur lors de la récupération des détails de la facture.</div>';
+            return [];
+        }
+    }
+
+}
+
+function getDatasTableByID($table, $id)
+{
+    global $pdo;
+
+                                                                                                                                                                       // Validation du nom de la table contre une liste blanche
+    $validTables = ['details_facture', 'achats', 'contrats', 'customers', 'suppliers', 'entrepots', 'factures', 'payments', 'produits', 'recettes', 'stock', 'users']; // Ajoutez d'autres noms de tables valides si nécessaire
+    if (! in_array($table, $validTables) || ! is_numeric($id) || empty($id)) {
+        return ['error' => 'Nom de table ou ID invalide.'];
+    }
+
+    $sql = "SELECT * FROM {$table} WHERE id = ?";
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$id]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        return ['error' => 'Erreur de base de données : ' . $e->getMessage()];
+    }
+}

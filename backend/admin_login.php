@@ -10,39 +10,55 @@
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Validation de l'email
+        $email    = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
+        $password = $_POST['password'] ?? '';
+
         if (! isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $message = '<div class="alert alert-danger">Erreur de sécurité CSRF.</div>';
+        } elseif (! $email) {
+            $message = '<div class="alert alert-danger">Format d\'email invalide.</div>';
         } else {
-            $email    = $_POST['email'] ?? '';
-            $password = $_POST['password'] ?? '';
+            try {
+                // Préparation de la requête avec PDO
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+                $stmt->execute([$email]);
 
-            // Préparation de la requête avec PDO
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-            $stmt->execute([$email]);
+                // Récupération du résultat
+                if ($user = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    // Comparaison avec le mot de passe haché en base
+                    if (password_verify($password, $user['password']) &&
+                        ($user['role'] === 'admin' || $user['role'] === 'employe')) {
 
-            // Récupération du résultat
-            if ($user = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                // Comparaison avec le mot de passe haché en base
-                if (password_verify($password, $user['password']) &&
-                    ($user['role'] === 'admin' || $user['role'] === 'employe')) {
+                        // Enregistrement des données de session
+                        $_SESSION['user_id'] = $user['id'];
+                        $_SESSION['pseudo']  = $user['pseudo'];
+                        $_SESSION['role']    = $user['role'];
+                        $_SESSION['statut']  = $user['statut'];
 
-                    // Enregistrement des données de session
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['pseudo']  = $user['pseudo'];
-                    $_SESSION['role']    = $user['role'];
+                        // Régénération de l'ID de session pour sécuriser la connexion
+                        session_regenerate_id(true);
 
-                    // Redirection en fonction du rôle
-                    if ($user['role'] === 'admin') {
-                        header('Location: admin_dashboard.php');
+                        if ($user['role'] === 'admin' && $user['statut'] === 'actif') {
+                            header('Location: admin_dashboard.php'); // Redirection pour les administrateurs
+                            exit;
+                        }
+
+                        if ($user['role'] === 'employe' && $user['statut'] === 'actif') {
+                            header('Location: employe_dashboard.php'); // Redirection pour les employés
+                            exit;
+                        }
+
                     } else {
-                        header('Location: employe_dashboard.php'); // Ajoutez une redirection pour les employés
+                        $message = '<div class="alert alert-danger">Identifiants incorrects.</div>';
                     }
-                    exit;
                 } else {
-                    $message = '<div class="alert alert-danger">Identifiants incorrects ou accès refusé.</div>';
+                    $message = '<div class="alert alert-danger">Identifiants incorrects.</div>';
                 }
-            } else {
-                $message = '<div class="alert alert-danger">Utilisateur non trouvé.</div>';
+            } catch (PDOException $e) {
+                $message = '<div class="alert alert-danger">Erreur de base de données.</div>';
+                // Log de l'erreur pour le développement
+                error_log($e->getMessage());
             }
         }
     }
@@ -63,7 +79,7 @@
           }
       ?>
       <form method="post" class="col d-flex justify-content-center gap-5 mb-4 mt-5">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8'); ?>">
             <div class="col-md-3 ">
                   <input type="email" name="email" class="form-control" placeholder="Email" required>
             </div>

@@ -1,8 +1,8 @@
 body {
   font-family: 'Segoe UI', sans-serif;
   min-height: 100vh;
-  background: #ebebeb;
-  overflow: hidden; /* empêche le scroll global */
+  background: #e1e1e1;
+  /* overflow: hidden; empêche le scroll global */
 }
 
 h1,
@@ -13,6 +13,20 @@ h5,
 h6 {
   font-weight: 600;
 }
+
+/* table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+th {
+  cursor: pointer;
+  background-color: #f2f2f2;
+} */
 
 .navbar {
   min-height: 10vh;
@@ -39,6 +53,32 @@ h6 {
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
   transition: transform 0.3s ease;
   z-index: 1000;
+}
+
+/* .modal-content {
+  background: linear-gradient(180deg, #0d6efd 60%, #198754 100%);
+}
+
+.modal-header {
+  background: linear-gradient(45deg, #429df9 60%, #acf0ce 100%);
+}
+
+.modal-body {
+  background: linear-gradient(180deg, #b5b5b5 60%, #d0ffe9 100%);
+} */
+
+.custom-modal {
+  background-color: #f8f9fa; /* Couleur de fond */
+  color: #343a40; /* Couleur du texte */
+}
+
+.custom-modal .modal-header {
+  background-color: #007bff; /* Couleur de l'en-tête */
+  color: white; /* Couleur du texte de l'en-tête */
+}
+
+.custom-modal .modal-footer {
+  background-color: #f1f1f1; /* Couleur du pied de page */
 }
 
 /* Pour décaler le contenu principal à droite sur grand écran */

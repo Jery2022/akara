@@ -1,6 +1,6 @@
 <?php
     session_start();
-    if (! isset($_SESSION['admin'])) {
+    if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
         header('Location: ../admin_login.php');
         exit;
     }
@@ -15,50 +15,61 @@
 
     $message = '';
 
-    // Filtrage et tri des paiements
+    // Filtrage et tri des achats
     $typeFilter     = $_GET['type'] ?? '';
     $categoryFilter = $_GET['category'] ?? '';
-    $sortBy         = $_GET['sort_by'] ?? 'customer_id';
+    $sortBy         = $_GET['sort_by'] ?? 'suppliers_id';
     $order          = $_GET['order'] ?? 'ASC';
 
     // Validation des paramètres de tri
-    $validSortColumns = ['id', 'contrat_id', 'user_id', 'supplier_id', 'amount'];
+    $validSortColumns = ['id', 'contrat_id', 'user_id', 'suppliers_id', 'amount'];
     if (! in_array($sortBy, $validSortColumns)) {
-        $sortBy = 'customers_id'; // Valeur par défaut
+        $sortBy = 'suppliers_id'; // Valeur par défaut
     }
 
     $order = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC'; // Assure que l'ordre est valide
+
+    // Validation des filtres
+    $validTypes      = ['virement', 'chèque', 'espèces'];
+    $validCategories = ['fournitures', 'équipement', 'services', 'maintenance', 'logistique'];
 
     // Construction de la requête SQL
     $query  = "SELECT * FROM achats WHERE 1=1";
     $params = [];
 
-    if ($typeFilter) {
+    if ($typeFilter && in_array($typeFilter, $validTypes)) {
         $query .= " AND type = ?";
         $params[] = $typeFilter;
     }
 
-    if ($categoryFilter) {
+    if ($categoryFilter && in_array($categoryFilter, $validCategories)) {
         $query .= " AND category = ?";
         $params[] = $categoryFilter;
     }
 
     $query .= " ORDER BY $sortBy $order";
 
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $achats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
+        $achats = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $message = '<div class="alert alert-danger">Erreur lors de la récupération des achats.</div>';
+    }
+
 ?>
-  <title>Gestion Achat</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"  rel="stylesheet">
+    <title>Gestion Achats</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
-  <div class="container my-4">
+<?php require_once 'partials/_navbar.php'; ?>
+<div class="container my-4">
     <h2>Liste des achats</h2>
-           <?php echo $message ?>
+    <?php echo $message ?>
 
-     <!-- Formulaire de filtre -->
-      <form method="get" class="row g-5 mb-4 mt-3">
+    <!-- Formulaire de filtre -->
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
         <div class="col-md-3">
             <select name="type" class="form-select">
                 <option value="">Tous les types</option>
@@ -75,22 +86,14 @@
                 <option value="">Toutes les catégories</option>
                 <option value="fournitures"
                   <?php echo($categoryFilter === "fournitures") ? 'selected' : ''; ?>>Fournitures</option>
-                <option value="élecricité"
-                  <?php echo($categoryFilter === "élecricité") ? 'selected' : ''; ?>>Elecricité</option>
-                <option value="téléphone"
-                  <?php echo($categoryFilter === "téléphone") ? 'selected' : ''; ?>>Téléphone</option>
-                <option value="carburant"
-                  <?php echo($categoryFilter === "carburant") ? 'selected' : ''; ?>>Carburant</option>
-                <option value="eau"
-                  <?php echo($categoryFilter === "eau") ? 'selected' : ''; ?>>Eau</option>
-                <option value="mobiliers"
-                  <?php echo($categoryFilter === "mobiliers") ? 'selected' : ''; ?>>Mobiliers</option>
-                                  <option value="fiscalité"
-                  <?php echo($categoryFilter === "fiscalité") ? 'selected' : ''; ?>>fiscalité</option>
-                                  <option value="impôts"
-                  <?php echo($categoryFilter === "impôts") ? 'selected' : ''; ?>>Impôts</option>
-                                  <option value="taxes"
-                  <?php echo($categoryFilter === "taxes") ? 'selected' : ''; ?>>Taxes</option>
+                <option value="équipement"
+                  <?php echo($categoryFilter === "équipement") ? 'selected' : ''; ?>>Équipement</option>
+                <option value="services"
+                  <?php echo($categoryFilter === "services") ? 'selected' : ''; ?>>Services</option>
+                <option value="maintenance"
+                  <?php echo($categoryFilter === "maintenance") ? 'selected' : ''; ?>>Maintenance</option>
+                <option value="logistique"
+                  <?php echo($categoryFilter === "logistique") ? 'selected' : ''; ?>>Logistique</option>
             </select>
         </div>
 
@@ -108,41 +111,43 @@
     </form>
 
     <!-- Tableau des achats -->
-    <table class="table table-striped table-hover">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Contrat</th>
-          <th>Reçu par</th>
-          <th>Fournisseur</th>
-          <th>Montant</th>
-          <th>Type</th>
-          <th>Catégorie</th>
-          <th>Date achat</th>
-        </tr>
-      </thead>
-      <tbody>
-          <?php if (empty($achats)): ?>
-              <tr>
-                  <td colspan="10" class="text-center">Aucun achat trouvé.</td>
-              </tr>
-          <?php else: ?>
+    <div class="bg-dark-subtle shadow p-3">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Contrat</th>
+                    <th>Reçu par</th>
+                    <th>Fournisseur</th>
+                    <th>Montant</th>
+                    <th>Type</th>
+                    <th>Catégorie</th>
+                    <th>Date achat</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($achats)): ?>
+                    <tr>
+                        <td colspan="8" class="text-center">Aucun achat trouvé.</td>
+                    </tr>
+                <?php else: ?>
 <?php foreach ($achats as $row): ?>
-            <tr>
-                  <td><?php echo htmlspecialchars($row['id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['contrat_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['user_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['suppliers_id']) ?></td>
-                  <td><?php echo htmlspecialchars($row['amount']) ?></td>
-                  <td><?php echo htmlspecialchars($row['type']) ?></td>
-                  <td><?php echo htmlspecialchars($row['category']) ?></td>
-                  <td><?php echo htmlspecialchars($row['date_achat']) ?></td>
-            </tr>
-        <?php endforeach; ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($row['id']) ?></td>
+                            <td><?php echo htmlspecialchars($row['contrat_id'] || '') ?></td>
+                            <td><?php echo htmlspecialchars($row['user_id']) ?></td>
+                            <td><?php echo htmlspecialchars($row['suppliers_id']) ?></td>
+                            <td><?php echo htmlspecialchars($row['amount']) ?></td>
+                            <td><?php echo htmlspecialchars($row['type']) ?></td>
+                            <td><?php echo htmlspecialchars($row['category']) ?></td>
+                            <td><?php echo htmlspecialchars($row['date_achat']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
 <?php endif; ?>
-      </tbody>
-    </table>
-  </div>
+            </tbody>
+        </table>
+    </div>
+</div>
 <?php
-require_once 'partials/_footer.php';
+    require_once 'partials/_footer.php';
 ?>
