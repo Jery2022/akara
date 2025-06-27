@@ -1,29 +1,29 @@
 <?php
-session_start();
-if (!isset($_SESSION['admin'])) {
-    header('Location: admin_login.php');
-    exit;
-}
-include 'db.php';
+    session_start();
+    if (! isset($_SESSION['admin'])) {
+        header('Location: admin_login.php');
+        exit;
+    }
+    require_once 'db.php';
 
-// Ajout d'un utilisateur
-if (isset($_POST['add'])) {
-    $email = $_POST['email'];
-    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-    $role = $_POST['role'];
-    $stmt = $conn->prepare("INSERT INTO users (email, password, role) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $email, $password, $role);
-    $stmt->execute();
-}
+    // Ajout d'un utilisateur
+    if (isset($_POST['add'])) {
+        $email    = $_POST['email'];
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+        $role     = $_POST['role'];
+        $stmt     = $conn->prepare("INSERT INTO users (email, password, role) VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $email, $password, $role);
+        $stmt->execute();
+    }
 
-// Suppression d'un utilisateur
-if (isset($_GET['delete'])) {
-    $id = intval($_GET['delete']);
-    $conn->query("DELETE FROM users WHERE id=$id");
-}
+    // Suppression d'un utilisateur
+    if (isset($_GET['delete'])) {
+        $id = intval($_GET['delete']);
+        $conn->query("DELETE FROM users WHERE id=$id");
+    }
 
-// Liste des utilisateurs
-$result = $conn->query("SELECT * FROM users");
+    // Liste des utilisateurs
+    $result = $conn->query("SELECT * FROM users");
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -78,7 +78,7 @@ $result = $conn->query("SELECT * FROM users");
                <option value="employe" selected>Employé</option>
             </select>
          </div>
-         <div class="col-md-2 d-flex justify-content-center 
+         <div class="col-md-2 d-flex justify-content-center
                align-items-end">
             <button type="submit" name="add" class="
                btn btn-outline-success  w-100">Ajouter
@@ -89,12 +89,12 @@ $result = $conn->query("SELECT * FROM users");
          <tr><th>ID</th><th>Email</th><th>Rôle</th><th>Statut</th><th>Action</th></tr>
          <?php while ($row = $result->fetch_assoc()): ?>
                <tr>
-                  <td><?= $row['id'] ?></td>
-                  <td><?= htmlspecialchars($row['email']) ?></td>
-                  <td><?= htmlspecialchars($row['role']) ?></td>
-                  <td><?= htmlspecialchars($row['statut']) ?></td>
+                  <td><?php echo $row['id']?></td>
+                  <td><?php echo htmlspecialchars($row['email'])?></td>
+                  <td><?php echo htmlspecialchars($row['role'])?></td>
+                  <td><?php echo htmlspecialchars($row['statut'])?></td>
                   <td>
-                     <a href="?delete=<?= $row['id'] ?>" class="btn btn-outline-danger" onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer</a>
+                     <a href="?delete=<?php echo $row['id']?>" class="btn btn-outline-danger" onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer</a>
                   </td>
                </tr>
          <?php endwhile; ?>
