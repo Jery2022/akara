@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -65,12 +65,12 @@
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des contrats</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow gap-3 p-3">
         <div class="col-md-3">
             <select name="type" class="form-select">
                 <option value="">Tous les types</option>
@@ -108,7 +108,7 @@
     </form>
 
     <!-- Tableau des contrats -->
-     <div class="bg-dark-subtle shadow p-3">
+     <div class="table-container bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
@@ -131,22 +131,22 @@
             <?php else: ?>
 <?php foreach ($contrats as $row): ?>
                     <tr>
-                        <td><?php echo htmlspecialchars($row['id']) ?></td>
-                        <td><?php echo htmlspecialchars($row['ref']) ?></td>
-                        <td><?php echo htmlspecialchars($row['objet']) ?></td>
-                        <td><?php echo htmlspecialchars($row['date_debut']) ?></td>
-                        <td><?php echo htmlspecialchars($row['date_fin']) ?></td>
-                        <td><?php echo htmlspecialchars($row['status']) ?></td>
-                        <td><?php echo htmlspecialchars($row['montant']) ?></td>
-                        <td><?php echo htmlspecialchars($row['date_signature']) ?></td>
-                        <td><?php echo htmlspecialchars($row['type']) ?></td>
+                        <td data-label="ID"><?php echo htmlspecialchars($row['id']) ?></td>
+                        <td data-label="Référence"><?php echo htmlspecialchars($row['ref']) ?></td>
+                        <td data-label="Objet"><?php echo htmlspecialchars($row['objet']) ?></td>
+                        <td data-label="Date début"><?php echo htmlspecialchars($row['date_debut']) ?></td>
+                        <td data-label="Date fin"><?php echo htmlspecialchars($row['date_fin']) ?></td>
+                        <td data-label="Statut"><?php echo htmlspecialchars($row['status']) ?></td>
+                        <td data-label="Montant"><?php echo htmlspecialchars($row['montant']) ?></td>
+                        <td data-label="Signé le"><?php echo htmlspecialchars($row['date_signature']) ?></td>
+                        <td data-label="Type"><?php echo htmlspecialchars($row['type']) ?></td>
                     </tr>
                 <?php endforeach; ?>
 <?php endif; ?>
         </tbody>
     </table>
 </div>
-</div>
+</main>
 <?php
     require_once 'partials/_footer.php';
 ?>

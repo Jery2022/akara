@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -46,12 +46,12 @@
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des quittances</h2>
     <?php echo $message; ?>
 
-    <form class="row mb-5 mt-5 bg-dark-subtle shadow p-3" id="filterForm" method="GET" action="">
-        <div class="col-md-5 d-flex flex-column gap-2">
+    <form class="row mb-5 mt-5 bg-dark-subtle shadow gap-3 p-3" id="filterForm" method="GET" action="">
+        <div class="col-md-5 d-flex flex-column  gap-2">
             <label><input type="checkbox" name="sortBy" value="montant"> Trier par Montant</label>
             <label><input type="checkbox" name="sortBy" value="date_paiement"> Trier par Date de Paiement</label>
             <label><input type="checkbox" name="sortBy" value="date_emission"> Trier par Date d'Émission</label>
@@ -59,8 +59,8 @@
         <div class="col-md-5 ">
             <select name="type" class="form-select">
                 <option value="">Tous les types</option>
-                <option value="fournisseur"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <?php echo($typeFilter === "fournisseur") ? 'selected' : ''; ?>>Fournisseur</option>
-                <option value="client"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   <?php echo($typeFilter === "client") ? 'selected' : ''; ?>>Client</option>
+                <option value="fournisseur"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <?php echo($typeFilter === "fournisseur") ? 'selected' : ''; ?>>Fournisseur</option>
+                <option value="client"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($typeFilter === "client") ? 'selected' : ''; ?>>Client</option>
             </select>
         </div>
         <div class="col-md-2 d-flex flex-column gap-3">
@@ -70,7 +70,7 @@
     </form>
 
     <!-- Tableau des quittances -->
-    <div class="bg-dark-subtle shadow p-3">
+    <div class="table-container bg-dark-subtle shadow p-3">
         <table class="table table-striped table-hover" id="quittanceTable">
             <thead>
                 <tr>
@@ -91,13 +91,13 @@
                 <?php else: ?>
 <?php foreach ($quittances as $row): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($row['numero_quittance']); ?></td>
-                            <td><?php echo htmlspecialchars($row['type']); ?></td>
-                            <td><?php echo htmlspecialchars($row['montant']); ?></td>
-                            <td><?php echo htmlspecialchars($row['periode_service']); ?></td>
-                            <td><?php echo htmlspecialchars($row['date_paiement']); ?></td>
-                            <td><?php echo htmlspecialchars($row['date_emission']); ?></td>
-                            <td><?php echo htmlspecialchars($row['employee_id']); ?></td>
+                            <td data-label="Numéro"><?php echo htmlspecialchars($row['numero_quittance']); ?></td>
+                            <td data-label="Type"><?php echo htmlspecialchars($row['type']); ?></td>
+                            <td data-label="Montant"><?php echo htmlspecialchars($row['montant']); ?></td>
+                            <td data-label="Période"><?php echo htmlspecialchars($row['periode_service']); ?></td>
+                            <td data-label="Date de Paiement"><?php echo htmlspecialchars($row['date_paiement']); ?></td>
+                            <td data-label="Date d'Émission"><?php echo htmlspecialchars($row['date_emission']); ?></td>
+                            <td data-label="Traité par :"><?php echo htmlspecialchars($row['employee_id']); ?></td>
                         </tr>
                     <?php endforeach; ?>
 <?php endif; ?>
@@ -160,6 +160,6 @@
             rows.forEach(row => tbody.appendChild(row));
         }
     </script>
-</div>
+</main>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <?php require_once 'partials/_footer.php'; ?>

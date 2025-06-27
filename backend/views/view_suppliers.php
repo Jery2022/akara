@@ -1,7 +1,8 @@
 <?php
     session_start();
+
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -58,18 +59,18 @@
     }
 
 ?>
-<title>Gestion Fournisseurs</title>
+<title>Gestion des Fournisseurs</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
   <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des fournisseurs</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow gap-3 p-3">
         <div class="col-md-3">
             <select name="black_list" class="form-select">
                 <option value="">Tous les black-listés ou non</option>
@@ -105,7 +106,7 @@
     </form>
 
     <!-- Tableau des fournisseurs -->
-      <div class="bg-dark-subtle shadow p-3">
+    <div class="table-container bg-dark-subtle shadow gap-3 p-3 ">
     <table class="table table-striped table-hover">
         <thead>
         <tr>
@@ -127,21 +128,21 @@
         <?php else: ?>
 <?php foreach ($suppliers as $row): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($row['id']) ?></td>
-                    <td><?php echo htmlspecialchars($row['name']) ?></td>
-                    <td><?php echo htmlspecialchars($row['refContact']) ?></td>
-                    <td><?php echo htmlspecialchars($row['phone']) ?></td>
-                    <td><?php echo htmlspecialchars($row['email']) ?></td>
-                    <td><?php echo htmlspecialchars($row['status']) ?></td>
-                    <td><?php echo htmlspecialchars($row['black_list']) ?></td>
-                    <td><?php echo htmlspecialchars($row['contrat_id']) ?></td>
+                    <td data-label="ID"><?php echo htmlspecialchars($row['id']) ?></td>
+                    <td data-label="Nom"><?php echo htmlspecialchars($row['name']) ?></td>
+                    <td data-label="Contact"><?php echo htmlspecialchars($row['refContact']) ?></td>
+                    <td data-label="Téléphone"><?php echo htmlspecialchars($row['phone']) ?></td>
+                    <td data-label="E-mail"><?php echo htmlspecialchars($row['email']) ?></td>
+                    <td data-label="Statut"><?php echo htmlspecialchars($row['status']) ?></td>
+                    <td data-label="Banis"><?php echo htmlspecialchars($row['black_list']) ?></td>
+                    <td data-label="Contrat"><?php echo htmlspecialchars($row['contrat_id']) ?></td>
                 </tr>
             <?php endforeach; ?>
 <?php endif; ?>
         </tbody>
     </table>
 </div>
-</div>
+</main>
 <?php
     require_once 'partials/_footer.php';
 ?>

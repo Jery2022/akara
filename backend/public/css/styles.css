@@ -14,19 +14,33 @@ h6 {
   font-weight: 600;
 }
 
-/* table {
+table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: collapse; /* Supprime les espaces entre les cellules */
+  table-layout: auto; /* LOG - Permet aux colonnes de s'ajuster en fonction du contenu */
+}
+thead {
+  background-color: #0d6efd; /* Couleur de fond de l'en-tête */
 }
 th,
 td {
-  border: 1px solid #ddd;
+  border: 1px solid black;
   padding: 8px;
+  text-align: left;
 }
 th {
   cursor: pointer;
   background-color: #f2f2f2;
-} */
+}
+
+.table-container {
+  overflow-x: auto; /* Permet le défilement horizontal si nécessaire */
+  border: 1px solid #ddd; /* Bordure autour du conteneur */
+}
+
+.container {
+  overflow-y: auto;
+}
 
 .navbar {
   min-height: 10vh;
@@ -55,18 +69,6 @@ th {
   z-index: 1000;
 }
 
-/* .modal-content {
-  background: linear-gradient(180deg, #0d6efd 60%, #198754 100%);
-}
-
-.modal-header {
-  background: linear-gradient(45deg, #429df9 60%, #acf0ce 100%);
-}
-
-.modal-body {
-  background: linear-gradient(180deg, #b5b5b5 60%, #d0ffe9 100%);
-} */
-
 .custom-modal {
   background-color: #f8f9fa; /* Couleur de fond */
   color: #343a40; /* Couleur du texte */
@@ -87,7 +89,7 @@ th {
   padding: 2rem 2rem 2rem 2rem;
   margin-left: 200px;
   flex-grow: 1;
-  overflow-y: auto;
+  /* overflow-y: auto; */
   z-index: 100;
 }
 
@@ -113,6 +115,30 @@ th {
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
+.horizontal-nav {
+  display: flex; /* Utilise flexbox pour aligner les éléments horizontalement */
+  justify-content: space-around; /* Espace les éléments uniformément */
+  background-color: #e1e1e1; /* Couleur de fond de la barre de navigation */
+  padding: 10px 0; /* Espacement vertical */
+  position: sticky; /* Reste en haut lors du défilement */
+  overflow-x: auto;
+  top: 0; /* Positionne la barre en haut */
+  z-index: 999; /* Assure que la barre est au-dessus des autres éléments */
+}
+
+.horizontal-nav .nav-link {
+  color: black; /* Couleur du texte */
+  text-decoration: none; /* Supprime le soulignement */
+  padding: 10px 15px; /* Espacement autour des liens */
+  border-radius: 5px; /* Coins arrondis */
+  transition: background 0.3s; /* Transition pour l'effet de survol */
+}
+
+.horizontal-nav .nav-link:hover {
+  background: #8c8c8c; /* Effet de survol */
+  color: #e1e1e1;
+}
+
 /* Cacher la sidebar par défaut sur mobile/tablette */
 @media (max-width: 768px) {
   .sidebar {
@@ -126,14 +152,77 @@ th {
 
 /* Pour occuper tout l'écran sur mobile */
 @media (max-width: 768px) {
+  body {
+    min-height: 100vh;
+    text-transform: 1.3rem;
+    background: #e1e1e1;
+    /* overflow: auto; autorise le scroll global */
+  }
+
   .main-content {
-    margin-left: 0;
+    margin-left: 0px;
+  }
+  .container {
+    width: 100%;
+  }
+  table {
+    width: 400px; /*Largeur fixe du tableau */
+    /*table-layout: auto;  Fixe la disposition des colonnes */
+  }
+
+  th,
+  td {
+    display: block; /* Affiche les cellules en bloc */
+    width: 100%; /* Prend toute la largeur */
+    box-sizing: border-box; /* Inclut le padding et la bordure dans la largeur */
+    position: relative; /* Positionne les cellules */
+    padding: 10px; /* Ajoute un padding autour du contenu */
+    /* margin-bottom: 10px; */
+  }
+
+  tr {
+    margin-bottom: 20px; /* Espacement entre les lignes */
+    display: block; /* Affiche les lignes en bloc */
+  }
+
+  thead {
+    display: none; /* Cache l'en-tête sur les petits écrans */
+  }
+
+  td {
+    padding-left: 50%; /* Ajoute un padding à gauche pour le texte */
+    padding-top: 30px; /* Ajoute un padding en haut pour éviter la superposition */
+    text-align: right; /* Aligne le texte à gauche */
+    position: relative; /* Positionne les cellules */
+  }
+
+  td::before {
+    content: attr(data-label); /* Affiche le label de la cellule */
+    position: absolute; /* Positionne le label */
+    left: 10px; /* Positionne le label à gauche */
+    top: 10px; /* Positionne le label en haut */
+    width: auto; /* Largeur automatique pour le label */
+    padding-right: 10px; /* Espacement à droite */
+    white-space: nowrap; /* Empêche le retour à la ligne */
+    font-weight: bold; /* Met le label en gras */
+    color: #333; /* Couleur du texte du label */
+  }
+
+  .horizontal-nav .nav-link {
+    padding: 10px; /* Ajuste le padding pour les petits écrans */
+    width: 100%; /* Prend toute la largeur */
+    text-align: center; /* Centre le texte */
   }
 }
 
-@media (max-width: 596px) {
-  .main-content {
-    margin-left: 0;
+/* Cacher la navigation horizontale sur grande taille */
+@media (min-width: 768px) {
+  .horizontal-nav {
+    transform: translateY(-100%);
+  }
+
+  .horizontal-nav.active {
+    transform: translateY(0);
   }
 }
 

@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -65,12 +65,12 @@
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des produits</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow gap-3 p-3">
         <div class="col-md-3">
             <select name="provenance" class="form-select">
                 <option value="">Toutes les provenances</option>
@@ -104,7 +104,7 @@
     </form>
 
     <!-- Tableau des produits -->
-    <div class="bg-dark-subtle shadow p-3">
+    <div class="table-container bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
         <thead>
         <tr>
@@ -127,22 +127,22 @@
         <?php else: ?>
 <?php foreach ($produits as $row): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($row['id']); ?></td>
-                    <td><?php echo htmlspecialchars($row['name']); ?></td>
-                    <td><?php echo htmlspecialchars($row['description']); ?></td>
-                    <td><?php echo htmlspecialchars($row['unit']); ?></td>
-                    <td><?php echo htmlspecialchars($row['price']); ?></td>
-                    <td><?php echo htmlspecialchars($row['provenance']); ?></td>
-                    <td><?php echo htmlspecialchars($row['disponibility']); ?></td>
-                    <td><?php echo htmlspecialchars($row['delai_livraison']); ?></td>
-                    <td><?php echo htmlspecialchars($row['category']); ?></td>
+                    <td data-label="ID">><?php echo htmlspecialchars($row['id']); ?></td>
+                    <td data-label="Nom">><?php echo htmlspecialchars($row['name']); ?></td>
+                    <td data-label="Description">><?php echo htmlspecialchars($row['description']); ?></td>
+                    <td data-label="Unité">><?php echo htmlspecialchars($row['unit']); ?></td>
+                    <td data-label="Prix">><?php echo htmlspecialchars($row['price']); ?></td>
+                    <td data-label="Provenance">><?php echo htmlspecialchars($row['provenance']); ?></td>
+                    <td data-label="Disponible">><?php echo htmlspecialchars($row['disponibility']); ?></td>
+                    <td data-label="Délai">><?php echo htmlspecialchars($row['delai_livraison']); ?></td>
+                    <td data-label="Catégorie">><?php echo htmlspecialchars($row['category']); ?></td>
                 </tr>
             <?php endforeach; ?>
 <?php endif; ?>
         </tbody>
     </table>
 </div>
-</div>
+</main>
 <?php
     require_once 'partials/_footer.php';
 ?>

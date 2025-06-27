@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -65,12 +65,12 @@
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des entrepôts</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow gap-3 p-3">
         <div class="col-md-3">
             <select name="black_list" class="form-select">
                 <option value="">Tous les black-listés ou non</option>
@@ -106,7 +106,7 @@
     </form>
 
     <!-- Tableau des entrepôts -->
-<div class="bg-dark-subtle shadow p-3">
+<div class="table-container bg-dark-subtle shadow p-3">
     <table class="table table-striped table-hover">
         <thead>
             <tr>
@@ -129,22 +129,22 @@
             <?php else: ?>
 <?php foreach ($entrepots as $row): ?>
                     <tr>
-                        <td><?php echo htmlspecialchars($row['id']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['name']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['adresse']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['responsable']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['email']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['telephone']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['capacity']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['quality_stockage']) ?> </td>
-                        <td><?php echo htmlspecialchars($row['black_list']) ?> </td>
+                        <td data-label="ID"><?php echo htmlspecialchars($row['id']) ?> </td>
+                        <td data-label="Nom"><?php echo htmlspecialchars($row['name']) ?> </td>
+                        <td data-label="Adresse"><?php echo htmlspecialchars($row['adresse']) ?> </td>
+                        <td data-label="Responsable"><?php echo htmlspecialchars($row['responsable']) ?> </td>
+                        <td data-label="E-mail"><?php echo htmlspecialchars($row['email']) ?> </td>
+                        <td data-label="Téléphone"><?php echo htmlspecialchars($row['telephone']) ?> </td>
+                        <td data-label="Capacité"><?php echo htmlspecialchars($row['capacity']) ?> </td>
+                        <td data-label="Stockage"><?php echo htmlspecialchars($row['quality_stockage']) ?> </td>
+                        <td data-label="Bannis"><?php echo htmlspecialchars($row['black_list']) ?> </td>
                     </tr>
                 <?php endforeach; ?>
 <?php endif; ?>
         </tbody>
     </table>
 </div>
-</div>
+</main>
 <?php
     require_once 'partials/_footer.php';
 ?>

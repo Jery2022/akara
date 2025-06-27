@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -64,32 +64,32 @@
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des clients</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3 ">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow gap-2 p-3 ">
         <div class="col-md-3">
             <select name="black_list" class="form-select">
                 <option value="">Tous les black-listés ou non</option>
-                <option value="oui"                                                                                                                                                                                                                   <?php echo($black_listFilter === "oui") ? 'selected' : ''; ?>>Oui</option>
-                <option value="non"                                                                                                                                                                                                                   <?php echo($black_listFilter === "non") ? 'selected' : ''; ?>>Non</option>
+                <option value="oui"                                                                                                                                                                                                                                                                                                                                                               <?php echo($black_listFilter === "oui") ? 'selected' : ''; ?>>Oui</option>
+                <option value="non"                                                                                                                                                                                                                                                                                                                                                               <?php echo($black_listFilter === "non") ? 'selected' : ''; ?>>Non</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="status" class="form-select">
                 <option value="">Tous les statuts</option>
-                <option value="sérieux"                                                                                                                                                                                                                                                 <?php echo($statusFilter === "sérieux") ? 'selected' : ''; ?>>Sérieux</option>
-                <option value="à risque"                                                                                                                                                                                                                                                       <?php echo($statusFilter === "à risque") ? 'selected' : ''; ?>>À risque</option>
-                <option value="à suivre"                                                                                                                                                                                                                                                       <?php echo($statusFilter === "à suivre") ? 'selected' : ''; ?>>À suivre</option>
+                <option value="sérieux"                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statusFilter === "sérieux") ? 'selected' : ''; ?>>Sérieux</option>
+                <option value="à risque"                                                                                                                                                                                                                                                                                                                                                                                                                           <?php echo($statusFilter === "à risque") ? 'selected' : ''; ?>>À risque</option>
+                <option value="à suivre"                                                                                                                                                                                                                                                                                                                                                                                                                           <?php echo($statusFilter === "à suivre") ? 'selected' : ''; ?>>À suivre</option>
             </select>
         </div>
 
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                                                                                                   <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                                                                                         <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                               <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                         <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -98,7 +98,7 @@
     </form>
 
     <!-- Tableau des clients -->
-    <div class="bg-dark-subtle shadow p-3">
+    <div class="table-container bg-dark-subtle shadow gap-3 p-3">
     <table class="table table-striped table-hover">
         <thead>
         <tr>
@@ -106,7 +106,7 @@
             <th>Nom</th>
             <th>Contact</th>
             <th>Téléphone</th>
-            <th>Email</th>
+            <th>E-mail</th>
             <th>Statut</th>
             <th>Bannis</th>
             <th>ID Contrat</th>
@@ -120,21 +120,21 @@
         <?php else: ?>
 <?php foreach ($customers as $row): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($row['id']) ?></td>
-                    <td><?php echo htmlspecialchars($row['name']) ?></td>
-                    <td><?php echo htmlspecialchars($row['refContact']) ?></td>
-                    <td><?php echo htmlspecialchars($row['phone']) ?></td>
-                    <td><?php echo htmlspecialchars($row['email']) ?></td>
-                    <td><?php echo htmlspecialchars($row['status']) ?></td>
-                    <td><?php echo htmlspecialchars($row['black_list']) ?></td>
-                    <td><?php echo htmlspecialchars($row['contrat_id'] ?? '') ?></td>
+                    <td data-label="ID"><?php echo htmlspecialchars($row['id']) ?></td>
+                    <td data-label="Nom"><?php echo htmlspecialchars($row['name']) ?></td>
+                    <td data-label="Contact"><?php echo htmlspecialchars($row['refContact']) ?></td>
+                    <td data-label="Téléphone"><?php echo htmlspecialchars($row['phone']) ?></td>
+                    <td data-label="E-mail"><?php echo htmlspecialchars($row['email']) ?></td>
+                    <td data-label="Statut"><?php echo htmlspecialchars($row['status']) ?></td>
+                    <td data-label="Bannis"><?php echo htmlspecialchars($row['black_list']) ?></td>
+                    <td data-label="ID Contrat"><?php echo htmlspecialchars($row['contrat_id'] ?? '') ?></td>
                 </tr>
             <?php endforeach; ?>
 <?php endif; ?>
         </tbody>
     </table>
 </div>
-</div>
+</main>
 <?php
     require_once 'partials/_footer.php';
 ?>

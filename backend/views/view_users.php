@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -147,7 +147,7 @@
 </head>
 <body>
  <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2 class="mb-4">Gestion des utilisateurs</h2>
     <?php echo $message ?>
 
@@ -164,7 +164,7 @@
           >Ajouter un utilisateur</button>
     </div>
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-3 bg-dark-subtle shadow p-3">
+    <form method="get" class="row mb-5 mt-3 bg-dark-subtle shadow gap-3 p-3">
         <div class="col-md-3">
             <select name="role" class="form-select">
                 <option value="">Tous les rôles</option>
@@ -197,8 +197,8 @@
     </form>
 
 <!-- Tableau des utilisateurs -->
- <div class="bg-dark-subtle shadow p-3">
-    <table class="table table-bordered table-striped">
+ <div class="table-container bg-dark-subtle shadow gap-3 p-3">
+    <table class="table table-striped table-hover">
         <thead>
             <tr>
                 <th>#</th>
@@ -220,11 +220,11 @@
 foreach ($users as $row): ?>
 
                 <tr>
-                    <td><?php echo $i++ ?></td>
-                    <td><?php echo htmlspecialchars($row['pseudo']) ?></td>
-                    <td><?php echo htmlspecialchars($row['email']) ?></td>
-                    <td><?php echo htmlspecialchars($row['role']) ?></td>
-                    <td><?php echo htmlspecialchars($row['statut']) ?></td>
+                    <td data-label="#"><?php echo $i++ ?></td>
+                    <td data-label="Pseudo"><?php echo htmlspecialchars($row['pseudo']) ?></td>
+                    <td data-label="Email"><?php echo htmlspecialchars($row['email']) ?></td>
+                    <td data-label="Rôle"><?php echo htmlspecialchars($row['role']) ?></td>
+                    <td data-label="Statut"><?php echo htmlspecialchars($row['statut']) ?></td>
                     <td>
                       <a href="?delete=<?php echo $row['id'] ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>"
                         class="btn btn-danger btn-sm"
@@ -246,7 +246,7 @@ foreach ($users as $row): ?>
         </tbody>
     </table>
 </div>
-</div>
+</main>
 
 <!-- Modal d'ajout d'un utilisateur -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">

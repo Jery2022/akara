@@ -1,7 +1,7 @@
 <?php
     session_start();
     if (! isset($_SESSION['role']) || ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'employe')) {
-        header('Location: ../admin_login.php');
+        header('Location: ../login.php');
         exit;
     }
 
@@ -64,12 +64,12 @@
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
-<div class="container my-4">
+<main class="container my-4">
     <h2>Liste des achats</h2>
     <?php echo $message ?>
 
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow p-3">
+    <form method="get" class="row mb-5 mt-5 bg-dark-subtle shadow gap-3 p-3">
         <div class="col-md-3">
             <select name="type" class="form-select">
                 <option value="">Tous les types</option>
@@ -111,7 +111,7 @@
     </form>
 
     <!-- Tableau des achats -->
-    <div class="bg-dark-subtle shadow p-3">
+    <div class="table-container bg-dark-subtle shadow p-3">
         <table class="table table-striped table-hover">
             <thead>
                 <tr>
@@ -133,21 +133,21 @@
                 <?php else: ?>
 <?php foreach ($achats as $row): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($row['id']) ?></td>
-                            <td><?php echo htmlspecialchars($row['contrat_id'] || '') ?></td>
-                            <td><?php echo htmlspecialchars($row['user_id']) ?></td>
-                            <td><?php echo htmlspecialchars($row['suppliers_id']) ?></td>
-                            <td><?php echo htmlspecialchars($row['amount']) ?></td>
-                            <td><?php echo htmlspecialchars($row['type']) ?></td>
-                            <td><?php echo htmlspecialchars($row['category']) ?></td>
-                            <td><?php echo htmlspecialchars($row['date_achat']) ?></td>
+                            <td data-label="ID"><?php echo htmlspecialchars($row['id']) ?></td>
+                            <td data-label="Contrat"><?php echo htmlspecialchars($row['contrat_id'] || '') ?></td>
+                            <td data-label="Reçu par"><?php echo htmlspecialchars($row['user_id']) ?></td>
+                            <td data-label="Fournisseur"><?php echo htmlspecialchars($row['suppliers_id']) ?></td>
+                            <td data-label="Montant"><?php echo htmlspecialchars($row['amount']) ?></td>
+                            <td data-label="Type"><?php echo htmlspecialchars($row['type']) ?></td>
+                            <td data-label="Catégorie"><?php echo htmlspecialchars($row['category']) ?></td>
+                            <td data-label="Date achat"><?php echo htmlspecialchars($row['date_achat']) ?></td>
                         </tr>
                     <?php endforeach; ?>
 <?php endif; ?>
             </tbody>
         </table>
     </div>
-</div>
+</main>
 <?php
     require_once 'partials/_footer.php';
 ?>

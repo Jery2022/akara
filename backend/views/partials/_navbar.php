@@ -6,6 +6,6 @@
       <div class="d-flex align-items-center">
       <span class="me-3">Bienvenue,
          <?php echo htmlspecialchars($_SESSION['pseudo']); ?></span>
-      <a href="../admin_logout.php" class="btn btn-outline-danger text-black btn-sm">Déconnexion</a>
+      <a href="../logout.php" class="btn btn-outline-danger text-black btn-sm">Déconnexion</a>
    </div>
 </navbar>
