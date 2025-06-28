@@ -1,0 +1,8 @@
+node_modules/
+dist/
+sql/
+vendor/
+.env
+.DS_Store
+hash.php
+config.php
