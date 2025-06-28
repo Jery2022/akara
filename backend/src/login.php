@@ -21,8 +21,9 @@
         } else {
             try {
                 // Préparation de la requête avec PDO
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-                $stmt->execute([$email]);
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email");
+                $stmt->bindParam(':email', $email);
+                $stmt->execute();
 
                 // Récupération du résultat
                 if ($user = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -35,6 +36,8 @@
                         $_SESSION['pseudo']  = $user['pseudo'];
                         $_SESSION['role']    = $user['role'];
                         $_SESSION['statut']  = $user['statut'];
+
+                        // var_dump($_SESSION['role']);
 
                         // Régénération de l'ID de session pour sécuriser la connexion
                         session_regenerate_id(true);

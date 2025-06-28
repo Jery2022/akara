@@ -5,6 +5,9 @@ define('DB_USER', 'votre_user_alwaysdata');
 define('DB_PASS', 'mot_de_passe_alwaysdata');
 define('DB_NAME', 'votre_db_alwaysdata');
 
+// Secret pour le Hash de mot de passe (si utilisé)
+define('PASSWORD_DEFAULT', '');
+
 // Secret pour JWT (si utilisé)
 define('JWT_SECRET', 'super_secret_key_123');
 
