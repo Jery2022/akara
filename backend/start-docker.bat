@@ -53,5 +53,6 @@ for /f "usebackq tokens=1,* delims==" %%A in ("%ENV_FILE%") do (
 )
 
 echo 🚀 Lancement de Docker Compose avec l'environnement %ENV_NAME%...
-docker-compose build -t app-akara .
+cd src
+docker-compose build
 docker-compose up -d
