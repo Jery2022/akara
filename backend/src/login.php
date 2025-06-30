@@ -1,5 +1,9 @@
 <?php
     session_start();
+
+    error_log("CSRF token en session : " . ($_SESSION['csrf_token'] ?? 'absent'));
+    error_log("CSRF token reçu : " . ($_POST['csrf_token'] ?? 'absent'));
+
     include 'db.php';
 
     $message = '';
@@ -43,7 +47,7 @@
                         if ($user['role'] === 'admin' && $user['statut'] === 'actif') {
                             header('Location: admin_dashboard.php'); // Redirection pour les administrateurs
                             exit;
-                        } 
+                        }
 
                         if ($user['role'] === 'employe' && $user['statut'] === 'actif') {
                             header('Location: employe_dashboard.php'); // Redirection pour les employés
