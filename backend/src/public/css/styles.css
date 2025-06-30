@@ -33,6 +33,29 @@ th {
   background-color: #f2f2f2;
 }
 
+.alert {
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.alert-danger {
+  background-color: #f8d7da; /* Couleur de fond rouge clair */
+  color: #721c24; /* Couleur du texte rouge foncé */
+  border: 1px solid #f5c6cb; /* Bordure rouge */
+}
+
+.alert-success {
+  background-color: #d4edda; /* Couleur de fond vert clair */
+  color: #155724; /* Couleur du texte vert foncé */
+  border: 1px solid #c3e6cb; /* Bordure verte */
+}
+
+.alert-container {
+  width: auto;
+}
+
 .table-container {
   overflow-x: auto; /* Permet le défilement horizontal si nécessaire */
   border: 1px solid #ddd; /* Bordure autour du conteneur */

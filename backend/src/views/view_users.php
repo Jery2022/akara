@@ -27,43 +27,52 @@
 
             if (empty($pseudo) || strlen($pseudo) < 3) {
                 $message = '<div class="alert alert-danger">Le pseudo doit contenir au moins 3 caractères.</div>';
+                echo json_encode(['message' => $message]);
                 return;
             }
             if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $message = '<div class="alert alert-danger">Email invalide.</div>';
+                $message = '<div class="alert alert-danger">E-mail invalide.</div>';
+                echo json_encode(['message' => $message]);
                 return;
             }
             if (empty($password) || strlen($password) < 8) {
                 $message = '<div class="alert alert-danger">Mot de passe invalide. Il doit contenir au moins 8 caractères.</div>';
+                echo json_encode(['message' => $message]);
                 return;
             }
             if (! in_array($role, ['admin', 'employe'])) {
-                $message = '<div class="alert alert-danger">Erreur serveur réessayer plus tard.</div>';
+                $message = '<div class="alert alert-danger">Rôle invalide. Choisissez entre admin et employe.</div>';
+                echo json_encode(['message' => $message]);
                 return;
             }
 
-            // Vérification de l'unicité de l'email
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            if ($stmt->fetch()) {
-                $message = '<div class="alert alert-danger">Cet email est déjà utilisé.</div>';
-                return;
-            }
+            try {
+                // Vérification de l'unicité de l'email et du pseudo
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR pseudo = ?");
+                $stmt->execute([$email, $pseudo]);
+                if ($stmt->fetch()) {
+                    $message = '<div class="alert alert-danger">Cet e-mail ou pseudo est déjà utilisé.</div>';
+                    echo json_encode(['message' => $message]);
+                    return;
+                }
 
-            // Vérification de l'unicité du pseudo
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE pseudo = ?");
-            $stmt->execute([$pseudo]);
-            if ($stmt->fetch()) {
-                $message = '<div class="alert alert-danger">Ce pseudo est déjà utilisé.</div>';
-                return;
-            }
+                // Hachage du mot de passe
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
-            // Hachage du mot de passe
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt          = $pdo->prepare("INSERT INTO users (pseudo, email, password, role, statut) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$pseudo, $email, $password_hash, $role, $statut]);
-            $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
+                $stmt = $pdo->prepare("INSERT INTO users (pseudo, email, password, role, statut) VALUES (?, ?, ?, ?, ?)");
+                if ($stmt->execute([$pseudo, $email, $password_hash, $role, $statut])) {
+                    $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
+                } else {
+                    $errorInfo = $stmt->errorInfo();
+                    $message   = '<div class="alert alert-danger">Erreur lors de l\'ajout de l\'utilisateur : ' . $errorInfo[2] . '</div>';
+                }
+            } catch (PDOException $e) {
+                $message = '<div class="alert alert-danger">Erreur de base de données : ' . $e->getMessage() . '</div>';
+            }
         }
+        // Renvoie le message au client
+        //echo json_encode(['message' => $message]);
+        $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
     }
 
     // Suppression d'un utilisateur
@@ -89,21 +98,28 @@
             $role   = $_POST['role'] ?? 'employe';
             $statut = $_POST['statut'] ?? 'actif';
 
-            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $message = '<div class="alert alert-danger">Email invalide.</div>';
+            if (empty($pseudo) || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $message = '<div class="alert alert-danger">Pseudo ou e-mail invalide.</div>';
             } else {
-                // Si le mot de passe est renseigné, on le met à jour
-                if (! empty($_POST['password'])) {
-                    $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-                    $stmt          = $pdo->prepare("UPDATE users SET pseudo=?, email=?, password=?, role=?, statut=? WHERE id=?");
-                    $stmt->execute([$pseudo, $email, $password_hash, $role, $statut, $id]);
-                } else {
-                    $stmt = $pdo->prepare("UPDATE users SET pseudo=?, email=?, role=?, statut=? WHERE id=?");
-                    $stmt->execute([$pseudo, $email, $role, $statut, $id]);
+                try {
+                    // Si le mot de passe est renseigné, on le met à jour
+                    if (! empty($_POST['password'])) {
+                        $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
+                        $stmt          = $pdo->prepare("UPDATE users SET pseudo=?, email=?, password=?, role=?, statut=? WHERE id=?");
+                        $stmt->execute([$pseudo, $email, $password_hash, $role, $statut, $id]);
+                    } else {
+                        $stmt = $pdo->prepare("UPDATE users SET pseudo=?, email=?, role=?, statut=? WHERE id=?");
+                        $stmt->execute([$pseudo, $email, $role, $statut, $id]);
+                    }
+                    $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
+                } catch (PDOException $e) {
+                    $message = '<div class="alert alert-danger">Erreur de base de données : ' . $e->getMessage() . '</div>';
                 }
-                $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
             }
         }
+        // Renvoie le message au client
+        //echo json_encode(['message' => $message]);
+        $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
     }
 
     // Filtrage et tri des utilisateurs
@@ -149,7 +165,11 @@
  <?php require_once 'partials/_navbar.php'; ?>
 <main class="container my-4">
     <h2 class="mb-4">Gestion des utilisateurs</h2>
-    <?php echo $message ?>
+    <div class="alert-container">
+        <?php if (isset($message) && ! empty($message)): ?>
+<?php echo $message; ?>
+<?php endif; ?>
+    </div>
 
     <!-- Bouton pour ajouter un utilisateur -->
     <div class="mb-3 mt-5">
@@ -203,7 +223,7 @@
             <tr>
                 <th>#</th>
                 <th>Pseudo</th>
-                <th>Email</th>
+                <th>E-mail</th>
                 <th>Rôle</th>
                 <th>Statut</th>
                 <th>Actions</th>
@@ -251,11 +271,11 @@ foreach ($users as $row): ?>
 <!-- Modal d'ajout d'un utilisateur -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <form method="post" class="modal-content">
+        <form method="post" class="modal-content" id="addUserForm">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>">
             <input type="hidden" name="id" id="add-id">
             <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel">Modifier l'utilisateur</h5>
+                <h5 class="modal-title" id="addUserModalLabel">Ajouter un utilisateur</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
             </div>
             <div class="modal-body">
@@ -275,7 +295,7 @@ foreach ($users as $row): ?>
                     <label for="add-role" class="form-label">Rôle</label>
                     <select name="role" id="add-role" class="form-select">
                         <option value="admin">Admin</option>
-                        <option value="employé" selected>Employé</option>
+                        <option value="employe" selected>Employé</option>
                     </select>
                 </div>
                 <div class="mb-3">
@@ -291,6 +311,7 @@ foreach ($users as $row): ?>
                 <button type="submit" name="add" class="btn btn-primary">Enregistrer</button>
             </div>
         </form>
+        <div id="notification" style="display:none;"></div>
     </div>
 </div>
 
@@ -366,4 +387,40 @@ foreach ($users as $row): ?>
         document.getElementById('edit-password').value = button.getAttribute('data-password') || '';
     });
 </script>
+<!-- <script>
+document.getElementById('addUserForm').addEventListener('submit', function(e) {
+    e.preventDefault(); // Empêche le rechargement de la page
+
+    const formData = new FormData(this);
+    formData.append('csrf_token', '<?php echo $_SESSION["csrf_token"]; ?>'); // Ajoutez le token CSRF
+
+    fetch('../routes/users.php', {
+        method: 'POST',
+        body: formData // Envoie les données du formulaire
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erreur réseau');
+        }
+        return response.text(); // Récupère la réponse en texte
+    })
+    .then(data => {
+        // Affiche le message de succès ou d'erreur
+        document.getElementById('notification').innerHTML = data;
+        document.getElementById('notification').style.display = 'block';
+        setTimeout(() => {
+            document.getElementById('notification').style.display = 'none';
+        }, 3000); // Masque le message après 3 secondes
+    })
+    .catch(error => {
+        document.getElementById('notification').innerHTML = '<div class="alert alert-danger">Erreur lors de l\'ajout de l\'utilisateur.</div>';
+        document.getElementById('notification').style.display = 'block';
+        setTimeout(() => {
+            document.getElementById('notification').style.display = 'none';
+        }, 3000);
+    });
+});
+</script> -->
+
+
 <?php require_once 'partials/_footer.php'; ?>

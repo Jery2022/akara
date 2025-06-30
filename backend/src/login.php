@@ -37,15 +37,13 @@
                         $_SESSION['role']    = $user['role'];
                         $_SESSION['statut']  = $user['statut'];
 
-                        // var_dump($_SESSION['role']);
-
                         // Régénération de l'ID de session pour sécuriser la connexion
                         session_regenerate_id(true);
 
                         if ($user['role'] === 'admin' && $user['statut'] === 'actif') {
                             header('Location: admin_dashboard.php'); // Redirection pour les administrateurs
                             exit;
-                        }
+                        } 
 
                         if ($user['role'] === 'employe' && $user['statut'] === 'actif') {
                             header('Location: employe_dashboard.php'); // Redirection pour les employés

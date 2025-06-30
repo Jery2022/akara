@@ -1,2 +1,7 @@
 docker/
 docker-compose.yml
+.env
+.env.local
+.env.dev
+.env.prod
+.dockerignore
