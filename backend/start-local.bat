@@ -52,7 +52,7 @@ if "%PORT%"=="" set "PORT=8000"
 
 echo 🚀 Lancement du serveur PHP sur http://localhost:%PORT% ...
 cd src
-php -S localhost:%PORT%
+php -S localhost:%PORT%  
 
 echo ✅ Serveur lancé. Appuyez sur une touche pour quitter ce terminal.
 pause

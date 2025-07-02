@@ -5,8 +5,10 @@
         exit;
     }
 
-    require_once '../db.php';
+    require_once '../../db.php';
     require_once 'partials/_header.php';
+
+    $pdo = getPDO();
 
     // CSRF token
     if (empty($_SESSION['csrf_token'])) {
@@ -127,15 +129,15 @@
         <?php else: ?>
 <?php foreach ($produits as $row): ?>
                 <tr>
-                    <td data-label="ID">><?php echo htmlspecialchars($row['id']); ?></td>
-                    <td data-label="Nom">><?php echo htmlspecialchars($row['name']); ?></td>
-                    <td data-label="Description">><?php echo htmlspecialchars($row['description']); ?></td>
-                    <td data-label="Unité">><?php echo htmlspecialchars($row['unit']); ?></td>
-                    <td data-label="Prix">><?php echo htmlspecialchars($row['price']); ?></td>
-                    <td data-label="Provenance">><?php echo htmlspecialchars($row['provenance']); ?></td>
-                    <td data-label="Disponible">><?php echo htmlspecialchars($row['disponibility']); ?></td>
-                    <td data-label="Délai">><?php echo htmlspecialchars($row['delai_livraison']); ?></td>
-                    <td data-label="Catégorie">><?php echo htmlspecialchars($row['category']); ?></td>
+                    <td data-label="ID"><?php echo htmlspecialchars($row['id']); ?></td>
+                    <td data-label="Nom"><?php echo htmlspecialchars($row['name']); ?></td>
+                    <td data-label="Description"><?php echo htmlspecialchars($row['description']); ?></td>
+                    <td data-label="Unité"><?php echo htmlspecialchars($row['unit']); ?></td>
+                    <td data-label="Prix"><?php echo htmlspecialchars($row['price']); ?></td>
+                    <td data-label="Provenance"><?php echo htmlspecialchars($row['provenance']); ?></td>
+                    <td data-label="Disponible"><?php echo htmlspecialchars($row['disponibility']); ?></td>
+                    <td data-label="Délai"><?php echo htmlspecialchars($row['delai_livraison']); ?></td>
+                    <td data-label="Catégorie"><?php echo htmlspecialchars($row['category']); ?></td>
                 </tr>
             <?php endforeach; ?>
 <?php endif; ?>

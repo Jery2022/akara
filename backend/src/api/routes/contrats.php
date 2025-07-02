@@ -1,6 +1,5 @@
 <?php
-include './db.php';
-require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../../../db.php';
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
@@ -34,31 +33,57 @@ function isAuthenticated()
     }
 }
 
-if (! isAuthenticated()) {
-    http_response_code(401);
-    echo json_encode([
-        'error'   => 'Accès non autorisé',
-        'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    exit;
-}
+return [
+    'GET'    => function () {
+        header("Content-Type: application/json");
+        header("Access-Control-Allow-Origin: http://localhost:3000");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-// Vérification de la connexion à la base de données
-if (! $pdo) {
-    echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-    exit;
-}
+        if (! isAuthenticated()) {
+            http_response_code(401);
+            echo json_encode([
+                'error'   => 'Accès non autorisé',
+                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
 
-switch ($_SERVER['REQUEST_METHOD']) {
-    case 'GET':
-        // Récupère tous les contrats
+        $pdo = getPDO();
+        if (! $pdo) {
+            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
+            exit;
+        }
+
         $stmt  = $pdo->query("SELECT * FROM contrats");
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($items);
-        break;
+        exit;
+    },
 
-    case 'POST':
-        // Ajoute un contrat
+    'POST'   => function () {
+        header("Content-Type: application/json");
+        header("Access-Control-Allow-Origin: http://localhost:3000");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+        if (! isAuthenticated()) {
+            http_response_code(401);
+            echo json_encode([
+                'error'   => 'Accès non autorisé',
+                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+
+        $pdo = getPDO();
+        if (! $pdo) {
+            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
+            exit;
+        }
+
         $data = json_decode(file_get_contents('php://input'), true);
         if (! isset($data['ref'], $data['objet'], $data['date_debut'], $data['date_fin'], $data['montant'], $data['type'], $data['date_signature'])) {
             echo json_encode(['error' => 'Champs obligatoires manquants']);
@@ -90,10 +115,31 @@ switch ($_SERVER['REQUEST_METHOD']) {
             'id'      => $pdo->lastInsertId(),
             'message' => 'Contrat ajouté avec succès',
         ]);
-        break;
+        exit;
+    },
 
-    case 'PUT':
-        // Modifie un contrat
+    'PUT'    => function () {
+        header("Content-Type: application/json");
+        header("Access-Control-Allow-Origin: http://localhost:3000");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+        if (! isAuthenticated()) {
+            http_response_code(401);
+            echo json_encode([
+                'error'   => 'Accès non autorisé',
+                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+
+        $pdo = getPDO();
+        if (! $pdo) {
+            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
+            exit;
+        }
+
         $data = json_decode(file_get_contents('php://input'), true);
         if (! isset($data['id'], $data['ref'], $data['objet'], $data['date_debut'], $data['date_fin'], $data['montant'], $data['type'], $data['date_signature'])) {
             echo json_encode(['error' => 'Champs obligatoires manquants']);
@@ -125,10 +171,33 @@ switch ($_SERVER['REQUEST_METHOD']) {
             'success' => true,
             'message' => 'Contrat modifié avec succès',
         ]);
-        break;
+        exit;
+    },
 
-    case 'DELETE':
-        // Supprime un contrat
+    'DELETE' => function () {
+        header("Content-Type: application/json");
+        header("Access-Control-Allow-Origin: http://localhost:3000");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+        if (! isAuthenticated()) {
+            http_response_code(401);
+            echo json_encode([
+                'error'   => 'Accès non autorisé',
+                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+
+        $pdo = getPDO();
+        if (! $pdo) {
+            echo json_encode([
+                'error' => 'Échec de la connexion à la base de données',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            exit;
+        }
+
         $id = intval($_GET['id'] ?? 0);
         if (! $id) {
             echo json_encode(['error' => 'ID manquant']);
@@ -136,21 +205,18 @@ switch ($_SERVER['REQUEST_METHOD']) {
         }
         $stmt = $pdo->prepare("DELETE FROM contrats WHERE id = ?");
         if (! $stmt) {
-            echo json_encode(['error' => 'Erreur lors de la préparation']);
+            echo json_encode([
+                'error' => 'Erreur lors de la préparation',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             exit;
         }
         $stmt->execute([$id]);
         echo json_encode([
             'success' => true,
             'message' => 'Contrat supprimé avec succès',
-        ]);
-        break;
-
-    default:
-        // Méthode non autorisée
-        http_response_code(405);
-        echo json_encode(['error' => 'Méthode non autorisée']);
-        break;
-}
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        exit;
+    },
+];
 // Ferme la connexion à la base de données
 $pdo = null;

@@ -5,8 +5,8 @@
         exit;
     }
 
-    require_once 'db.php';
-    require_once 'functions.php';
+    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/functions.php';
 
     $recettes = getMonthlyRecettes();
     $depenses = getMonthlyDepenses();

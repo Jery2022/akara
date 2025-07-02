@@ -4,7 +4,7 @@
     error_log("CSRF token en session : " . ($_SESSION['csrf_token'] ?? 'absent'));
     error_log("CSRF token reçu : " . ($_POST['csrf_token'] ?? 'absent'));
 
-    include 'db.php';
+    require_once __DIR__ . '/../db.php';
 
     $message = '';
 
@@ -25,6 +25,7 @@
         } else {
             try {
                 // Préparation de la requête avec PDO
+                $pdo  = getPDO();
                 $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email");
                 $stmt->bindParam(':email', $email);
                 $stmt->execute();

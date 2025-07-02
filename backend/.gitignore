@@ -5,3 +5,4 @@ docker-compose.yml
 .env.dev
 .env.prod
 .dockerignore
+test*.php

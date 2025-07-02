@@ -5,8 +5,9 @@
         exit;
     }
 
-    require_once '../db.php';
-    require_once 'partials/_header.php';
+    require_once '../../db.php';
+
+    $pdo = getPDO();
 
     // CSRF token
     if (empty($_SESSION['csrf_token'])) {
@@ -73,23 +74,23 @@
         <div class="col-md-3">
             <select name="black_list" class="form-select">
                 <option value="">Tous les black-listés ou non</option>
-                <option value="oui"                                                                                                                                                                                                                                                                                                                                                               <?php echo($black_listFilter === "oui") ? 'selected' : ''; ?>>Oui</option>
-                <option value="non"                                                                                                                                                                                                                                                                                                                                                               <?php echo($black_listFilter === "non") ? 'selected' : ''; ?>>Non</option>
+                <option value="oui"                                                                                                                                                                                                                                                                                                                                                                                                                                     <?php echo($black_listFilter === "oui") ? 'selected' : ''; ?>>Oui</option>
+                <option value="non"                                                                                                                                                                                                                                                                                                                                                                                                                                     <?php echo($black_listFilter === "non") ? 'selected' : ''; ?>>Non</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="status" class="form-select">
                 <option value="">Tous les statuts</option>
-                <option value="sérieux"                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statusFilter === "sérieux") ? 'selected' : ''; ?>>Sérieux</option>
-                <option value="à risque"                                                                                                                                                                                                                                                                                                                                                                                                                           <?php echo($statusFilter === "à risque") ? 'selected' : ''; ?>>À risque</option>
-                <option value="à suivre"                                                                                                                                                                                                                                                                                                                                                                                                                           <?php echo($statusFilter === "à suivre") ? 'selected' : ''; ?>>À suivre</option>
+                <option value="sérieux"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($statusFilter === "sérieux") ? 'selected' : ''; ?>>Sérieux</option>
+                <option value="à risque"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             <?php echo($statusFilter === "à risque") ? 'selected' : ''; ?>>À risque</option>
+                <option value="à suivre"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             <?php echo($statusFilter === "à suivre") ? 'selected' : ''; ?>>À suivre</option>
             </select>
         </div>
 
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                               <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                         <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                                                                                                     <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">

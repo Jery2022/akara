@@ -6,3 +6,4 @@ vendor/
 .DS_Store
 hash.php
 config.php
+* copy.php

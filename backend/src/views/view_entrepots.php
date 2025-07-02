@@ -5,8 +5,10 @@
         exit;
     }
 
-    require_once '../db.php';
+    require_once '../../db.php';
     require_once 'partials/_header.php';
+
+    $pdo = getPDO();
 
     // CSRF token
     if (empty($_SESSION['csrf_token'])) {

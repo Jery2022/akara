@@ -1,21 +1,22 @@
 <?php
-include 'db.php';
+require_once __DIR__ . '/../db.php';
 
 // vérification de la connexion PDO
+$pdo = getPDO();
 if (! $pdo) {
     die("Échec de la connexion à la base de données.");
 }
 
 function getAll($table)
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->query("SELECT * FROM $table");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getById($table, $id)
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->prepare("SELECT * FROM $table WHERE id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -23,7 +24,7 @@ function getById($table, $id)
 
 function getByField($table, $field, $value)
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->prepare("SELECT * FROM $table WHERE $field = ?");
     $stmt->execute([$value]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -31,14 +32,14 @@ function getByField($table, $field, $value)
 
 function getTotal($table)
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->query("SELECT COUNT(*) FROM $table");
     return $stmt->fetchColumn();
 }
 
 function getRecettesTotal()
 {
-    global $pdo;
+    $pdo   = getPDO();
     $stmt  = $pdo->query("SELECT SUM(total) FROM recettes");
     $total = $stmt->fetchColumn();
 
@@ -50,7 +51,7 @@ function getRecettesTotal()
 
 function getDepensesTotal()
 {
-    global $pdo;
+    $pdo   = getPDO();
     $stmt  = $pdo->query("SELECT SUM(total) FROM depenses");
     $total = $stmt->fetchColumn();
 
@@ -62,7 +63,7 @@ function getDepensesTotal()
 
 function getPaymentsTotal()
 {
-    global $pdo;
+    $pdo   = getPDO();
     $stmt  = $pdo->query("SELECT SUM(amount) FROM payments");
     $total = $stmt->fetchColumn();
 
@@ -74,7 +75,7 @@ function getPaymentsTotal()
 
 function getAchatsTotal()
 {
-    global $pdo;
+    $pdo   = getPDO();
     $stmt  = $pdo->query("SELECT SUM(amount) FROM achats");
     $total = $stmt->fetchColumn();
 
@@ -86,35 +87,35 @@ function getAchatsTotal()
 
 function getMonthlyRecettes()
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->query("SELECT DATE_FORMAT(date_recette, '%Y-%m') AS month, SUM(total) AS total FROM recettes GROUP BY month ORDER BY month");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getMonthlyDepenses()
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->query("SELECT DATE_FORMAT(date_depense, '%Y-%m') AS month, SUM(total) AS total FROM depenses GROUP BY month ORDER BY month");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getMonthlyAchats()
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->query("SELECT DATE_FORMAT(date_achat, '%Y-%m') AS month, SUM(amount) AS total FROM achats GROUP BY month ORDER BY month");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getMonthlyPayments()
 {
-    global $pdo;
+    $pdo  = getPDO();
     $stmt = $pdo->query("SELECT DATE_FORMAT(date_payment, '%Y-%m') AS month, SUM(amount) AS total FROM payments GROUP BY month ORDER BY month");
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getDetailsFactures($id)
 {
-    global $pdo;
+    $pdo = getPDO();
 
     if (! intval($id) || $id === '') {
         return [];
@@ -133,7 +134,7 @@ function getDetailsFactures($id)
 
 function getDatasTableByID($table, $id)
 {
-    global $pdo;
+    $pdo = getPDO();
 
                                                                                                                                                                        // Validation du nom de la table contre une liste blanche
     $validTables = ['details_facture', 'achats', 'contrats', 'customers', 'suppliers', 'entrepots', 'factures', 'payments', 'produits', 'recettes', 'stock', 'users']; // Ajoutez d'autres noms de tables valides si nécessaire

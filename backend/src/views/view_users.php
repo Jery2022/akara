@@ -5,7 +5,9 @@
         exit;
     }
 
-    require_once '../db.php';
+    require_once '../../db.php';
+
+    $pdo = getPDO();
 
     // CSRF token
     if (empty($_SESSION['csrf_token'])) {
@@ -27,52 +29,36 @@
 
             if (empty($pseudo) || strlen($pseudo) < 3) {
                 $message = '<div class="alert alert-danger">Le pseudo doit contenir au moins 3 caractères.</div>';
-                echo json_encode(['message' => $message]);
-                return;
-            }
-            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            } elseif (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $message = '<div class="alert alert-danger">E-mail invalide.</div>';
-                echo json_encode(['message' => $message]);
-                return;
-            }
-            if (empty($password) || strlen($password) < 8) {
+            } elseif (empty($password) || strlen($password) < 8) {
                 $message = '<div class="alert alert-danger">Mot de passe invalide. Il doit contenir au moins 8 caractères.</div>';
-                echo json_encode(['message' => $message]);
-                return;
-            }
-            if (! in_array($role, ['admin', 'employe'])) {
+            } elseif (! in_array($role, ['admin', 'employe'])) {
                 $message = '<div class="alert alert-danger">Rôle invalide. Choisissez entre admin et employe.</div>';
-                echo json_encode(['message' => $message]);
-                return;
-            }
+            } else {
+                try {
+                    // Vérification de l'unicité de l'email et du pseudo
+                    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR pseudo = ?");
+                    $stmt->execute([$email, $pseudo]);
+                    if ($stmt->fetch()) {
+                        $message = '<div class="alert alert-danger">Cet e-mail ou pseudo est déjà utilisé.</div>';
+                    } else {
+                        // Hachage du mot de passe
+                        $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
-            try {
-                // Vérification de l'unicité de l'email et du pseudo
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR pseudo = ?");
-                $stmt->execute([$email, $pseudo]);
-                if ($stmt->fetch()) {
-                    $message = '<div class="alert alert-danger">Cet e-mail ou pseudo est déjà utilisé.</div>';
-                    echo json_encode(['message' => $message]);
-                    return;
+                        $stmt = $pdo->prepare("INSERT INTO users (pseudo, email, password, role, statut) VALUES (?, ?, ?, ?, ?)");
+                        if ($stmt->execute([$pseudo, $email, $password_hash, $role, $statut])) {
+                            $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
+                        } else {
+                            $errorInfo = $stmt->errorInfo();
+                            $message   = '<div class="alert alert-danger">Erreur lors de l\'ajout de l\'utilisateur : ' . $errorInfo[2] . '</div>';
+                        }
+                    }
+                } catch (PDOException $e) {
+                    $message = '<div class="alert alert-danger">Erreur de base de données : ' . $e->getMessage() . '</div>';
                 }
-
-                // Hachage du mot de passe
-                $password_hash = password_hash($password, PASSWORD_DEFAULT);
-
-                $stmt = $pdo->prepare("INSERT INTO users (pseudo, email, password, role, statut) VALUES (?, ?, ?, ?, ?)");
-                if ($stmt->execute([$pseudo, $email, $password_hash, $role, $statut])) {
-                    $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
-                } else {
-                    $errorInfo = $stmt->errorInfo();
-                    $message   = '<div class="alert alert-danger">Erreur lors de l\'ajout de l\'utilisateur : ' . $errorInfo[2] . '</div>';
-                }
-            } catch (PDOException $e) {
-                $message = '<div class="alert alert-danger">Erreur de base de données : ' . $e->getMessage() . '</div>';
             }
         }
-        // Renvoie le message au client
-        //echo json_encode(['message' => $message]);
-        $message = '<div class="alert alert-success">Utilisateur ajouté avec succès.</div>';
     }
 
     // Suppression d'un utilisateur
@@ -92,34 +78,44 @@
         if (! isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
             $message = '<div class="alert alert-danger">Erreur de sécurité CSRF.</div>';
         } else {
-            $id     = intval($_POST['id']);
-            $pseudo = trim($_POST['pseudo'] ?? '');
-            $email  = trim($_POST['email'] ?? '');
-            $role   = $_POST['role'] ?? 'employe';
-            $statut = $_POST['statut'] ?? 'actif';
+            $id       = intval($_POST['id']);
+            $pseudo   = trim($_POST['pseudo'] ?? '');
+            $email    = trim($_POST['email'] ?? '');
+            $password = $_POST['password'] ?? '';
+            $role     = $_POST['role'] ?? 'employe';
+            $statut   = $_POST['statut'] ?? 'actif';
 
-            if (empty($pseudo) || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $message = '<div class="alert alert-danger">Pseudo ou e-mail invalide.</div>';
+            if (empty($pseudo) || strlen($pseudo) < 3) {
+                $message = '<div class="alert alert-danger">Le pseudo doit contenir au moins 3 caractères.</div>';
+            } elseif (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $message = '<div class="alert alert-danger">E-mail invalide.</div>';
+            } elseif (! empty($password) && strlen($password) < 8) {
+                $message = '<div class="alert alert-danger">Mot de passe invalide. Il doit contenir au moins 8 caractères.</div>';
+            } elseif (! in_array($role, ['admin', 'employe'])) {
+                $message = '<div class="alert alert-danger">Rôle invalide. Choisissez entre admin et employe.</div>';
             } else {
                 try {
-                    // Si le mot de passe est renseigné, on le met à jour
-                    if (! empty($_POST['password'])) {
-                        $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-                        $stmt          = $pdo->prepare("UPDATE users SET pseudo=?, email=?, password=?, role=?, statut=? WHERE id=?");
-                        $stmt->execute([$pseudo, $email, $password_hash, $role, $statut, $id]);
+                    // Vérification de l'unicité de l'email et du pseudo (hors utilisateur courant)
+                    $stmt = $pdo->prepare("SELECT id FROM users WHERE (email = ? OR pseudo = ?) AND id != ?");
+                    $stmt->execute([$email, $pseudo, $id]);
+                    if ($stmt->fetch()) {
+                        $message = '<div class="alert alert-danger">Cet e-mail ou pseudo est déjà utilisé par un autre utilisateur.</div>';
                     } else {
-                        $stmt = $pdo->prepare("UPDATE users SET pseudo=?, email=?, role=?, statut=? WHERE id=?");
-                        $stmt->execute([$pseudo, $email, $role, $statut, $id]);
+                        if (! empty($password)) {
+                            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                            $stmt          = $pdo->prepare("UPDATE users SET pseudo=?, email=?, password=?, role=?, statut=? WHERE id=?");
+                            $stmt->execute([$pseudo, $email, $password_hash, $role, $statut, $id]);
+                        } else {
+                            $stmt = $pdo->prepare("UPDATE users SET pseudo=?, email=?, role=?, statut=? WHERE id=?");
+                            $stmt->execute([$pseudo, $email, $role, $statut, $id]);
+                        }
+                        $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
                     }
-                    $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
                 } catch (PDOException $e) {
                     $message = '<div class="alert alert-danger">Erreur de base de données : ' . $e->getMessage() . '</div>';
                 }
             }
         }
-        // Renvoie le message au client
-        //echo json_encode(['message' => $message]);
-        $message = '<div class="alert alert-success">Utilisateur modifié avec succès.</div>';
     }
 
     // Filtrage et tri des utilisateurs
@@ -163,13 +159,24 @@
 </head>
 <body>
  <?php require_once 'partials/_navbar.php'; ?>
+ <!-- Toast Bootstrap pour les messages -->
+<div class="position-fixed bottom-0   end-0  p-2" style="z-index: 1100">
+  <div id="mainToast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="mainToastBody">
+        <!-- Le message sera injecté ici -->
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
+    </div>
+  </div>
+</div>
 <main class="container my-4">
     <h2 class="mb-4">Gestion des utilisateurs</h2>
-    <div class="alert-container">
-        <?php if (isset($message) && ! empty($message)): ?>
-<?php echo $message; ?>
-<?php endif; ?>
-    </div>
+    <!-- <div class="alert-container">
+        <?php // if (isset($message) && ! empty($message)): ?>
+<?php         //echo $message; ?>
+<?php         //endif; ?>
+    </div> -->
 
     <!-- Bouton pour ajouter un utilisateur -->
     <div class="mb-3 mt-5">
@@ -271,47 +278,48 @@ foreach ($users as $row): ?>
 <!-- Modal d'ajout d'un utilisateur -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
     <div class="modal-dialog">
-        <form method="post" class="modal-content" id="addUserForm">
-            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>">
-            <input type="hidden" name="id" id="add-id">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel">Ajouter un utilisateur</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+     <form method="post" class="modal-content" id="addUserForm">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>">
+        <input type="hidden" name="id" id="add-id">
+        <div class="modal-header">
+            <h5 class="modal-title" id="addUserModalLabel">Ajouter un utilisateur</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+            <!-- Affichage des messages dans le modal -->
+            <div id="notification" style="display:none;"></div>
+            <div class="mb-3">
+                <label for="add-pseudo" class="form-label">Pseudo</label>
+                <input type="pseudo" name="pseudo" id="add-pseudo" class="form-control" required>
             </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="add-pseudo" class="form-label">Pseudo</label>
-                    <input type="pseudo" name="pseudo" id="add-pseudo" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label for="add-email" class="form-label">Email</label>
-                    <input type="email" name="email" id="add-email" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label for="add-password" class="form-label">Mot de passe</label>
-                    <input type="password" name="password" id="add-password" class="form-control">
-                </div>
-                <div class="mb-3">
-                    <label for="add-role" class="form-label">Rôle</label>
-                    <select name="role" id="add-role" class="form-select">
-                        <option value="admin">Admin</option>
-                        <option value="employe" selected>Employé</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="add-statut" class="form-label">Statut</label>
-                    <select name="statut" id="add-statut" class="form-select">
-                        <option value="actif" selected>Actif</option>
-                        <option value="désactivé">Désactivé</option>
-                    </select>
-                </div>
+            <div class="mb-3">
+                <label for="add-email" class="form-label">Email</label>
+                <input type="email" name="email" id="add-email" class="form-control" required>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="submit" name="add" class="btn btn-primary">Enregistrer</button>
+            <div class="mb-3">
+                <label for="add-password" class="form-label">Mot de passe</label>
+                <input type="password" name="password" id="add-password" class="form-control" required>
             </div>
-        </form>
-        <div id="notification" style="display:none;"></div>
+            <div class="mb-3">
+                <label for="add-role" class="form-label">Rôle</label>
+                <select name="role" id="add-role" class="form-select" required>
+                    <option value="admin">Admin</option>
+                    <option value="employe" selected>Employé</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="add-statut" class="form-label">Statut</label>
+                <select name="statut" id="add-statut" class="form-select" required>
+                    <option value="actif" selected>Actif</option>
+                    <option value="désactivé">Désactivé</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+            <button type="submit" name="add" class="btn btn-primary">Enregistrer</button>
+        </div>
+    </form>
     </div>
 </div>
 
@@ -340,14 +348,14 @@ foreach ($users as $row): ?>
                 </div>
                 <div class="mb-3">
                     <label for="edit-role" class="form-label">Rôle</label>
-                    <select name="role" id="edit-role" class="form-select">
+                    <select name="role" id="edit-role" class="form-select" required>
                         <option value="admin">Admin</option>
                         <option value="employe" selected>Employé</option>
                     </select>
                 </div>
                 <div class="mb-3">
                     <label for="edit-statut" class="form-label">Statut</label>
-                    <select name="statut" id="edit-statut" class="form-select">
+                    <select name="statut" id="edit-statut" class="form-select" required>
                         <option value="actif" selected>Actif</option>
                         <option value="désactivé">Désactivé</option>
                     </select>
@@ -387,40 +395,60 @@ foreach ($users as $row): ?>
         document.getElementById('edit-password').value = button.getAttribute('data-password') || '';
     });
 </script>
-<!-- <script>
-document.getElementById('addUserForm').addEventListener('submit', function(e) {
-    e.preventDefault(); // Empêche le rechargement de la page
+<script>
+    document.getElementById('addUserForm').addEventListener('submit', function(e) {
+        let errors = [];
+        let pseudo = document.getElementById('add-pseudo').value.trim();
+        let email = document.getElementById('add-email').value.trim();
+        let password = document.getElementById('add-password').value;
+        let role = document.getElementById('add-role').value;
+        let statut = document.getElementById('add-statut').value;
 
-    const formData = new FormData(this);
-    formData.append('csrf_token', '<?php echo $_SESSION["csrf_token"]; ?>'); // Ajoutez le token CSRF
+        if (pseudo.length < 3) errors.push("Le pseudo doit contenir au moins 3 caractères.");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("L'e-mail n'est pas valide.");
+        if (password.length < 8) errors.push("Le mot de passe doit contenir au moins 8 caractères.");
+        if (role !== "admin" && role !== "employe") errors.push("Le rôle doit être admin ou employé.");
+        if (statut !== "actif" && statut !== "désactivé") errors.push("Le statut doit être actif ou désactivé.");
 
-    fetch('../routes/users.php', {
-        method: 'POST',
-        body: formData // Envoie les données du formulaire
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Erreur réseau');
+        if (errors.length > 0) {
+            e.preventDefault();
+            let notif = document.getElementById('notification');
+            notif.innerHTML = '<div class="alert alert-danger">' + errors.join('<br>') + '</div>';
+            notif.style.display = 'block';
+            setTimeout(() => { notif.style.display = 'none'; }, 4000);
         }
-        return response.text(); // Récupère la réponse en texte
-    })
-    .then(data => {
-        // Affiche le message de succès ou d'erreur
-        document.getElementById('notification').innerHTML = data;
-        document.getElementById('notification').style.display = 'block';
-        setTimeout(() => {
-            document.getElementById('notification').style.display = 'none';
-        }, 3000); // Masque le message après 3 secondes
-    })
-    .catch(error => {
-        document.getElementById('notification').innerHTML = '<div class="alert alert-danger">Erreur lors de l\'ajout de l\'utilisateur.</div>';
-        document.getElementById('notification').style.display = 'block';
-        setTimeout(() => {
-            document.getElementById('notification').style.display = 'none';
-        }, 3000);
     });
+</script>
+
+<!-- Affiche et fait dsiparaître le message automatiquement  -->
+<!-- <script>
+document.addEventListener('DOMContentLoaded', function() {
+    let alert = document.querySelector('.alert-container .alert');
+    if(alert) {
+        setTimeout(() => { alert.style.display = 'none'; }, 4000);
+    }
 });
 </script> -->
 
+<!-- Affiche et fait dsiparaître le message dans toast automatiquement  -->
+<?php if (isset($message) && ! empty($message)): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var toastBody = document.getElementById('mainToastBody');
+    toastBody.innerHTML =                                                                                                                                                                                                                                  <?php echo json_encode(strip_tags($message, '<div><br>')); ?>;
+    // Change la couleur selon le type de message
+    var toast = document.getElementById('mainToast');
+    if (toastBody.innerHTML.includes('alert-success')) {
+        toast.classList.remove('text-bg-danger');
+        toast.classList.add('text-bg-success');
+    } else {
+        toast.classList.remove('text-bg-success');
+        toast.classList.add('text-bg-danger');
+    }
+    var bsToast = new bootstrap.Toast(toast, { delay: 4000 });
+    bsToast.show();
+});
+</script>
+<?php endif; ?>
 
 <?php require_once 'partials/_footer.php'; ?>
