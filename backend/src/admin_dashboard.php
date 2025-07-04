@@ -5,7 +5,7 @@
         exit;
     }
 
-    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/db.php';
     require_once __DIR__ . '/functions.php';
 
     $recettes = getMonthlyRecettes();
@@ -41,13 +41,13 @@
     }
 ?>
 
-<?php require_once './views/partials/_header.php'; ?>
+<?php require_once __DIR__ . '/views/partials/_header.php'; ?>
 <title>Akara Administration</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/public/css/styles.css">
 </head>
 <body>
-  <?php require_once './views/partials/_navbar.php'; ?>
+  <?php require_once __DIR__ . '/views/partials/_navbar.php'; ?>
   <div class="sidebar d-flex flex-column align-items-start">
     <h4 class="px-3 mb-1">Dashboard</h4>
     <hr class="w-100 my-2 border-light">
@@ -70,7 +70,7 @@
               'quittances' => 'Quittances',
           ];
       foreach ($tables as $table => $label): ?>
-          <a href="views/view_<?php echo htmlspecialchars($table); ?>.php" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
+          <a href="/views/view_<?php echo htmlspecialchars($table); ?>.php" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
       <?php endforeach; ?>
     </nav>
   </div>
@@ -80,7 +80,7 @@
       <nav class="horizontal-nav">
           <?php
           foreach ($tables as $table => $label): ?>
-          <a href="views/view_<?php echo htmlspecialchars($table); ?>.php" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
+          <a href="/views/view_<?php echo htmlspecialchars($table); ?>.php" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
       <?php endforeach; ?>
       </nav>
   </header>

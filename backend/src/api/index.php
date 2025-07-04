@@ -1,6 +1,6 @@
 <?php
 // require_once __DIR__ . '/../../bootstrap.php';
-require_once __DIR__ . '/../Core/Response.php';
+require_once __DIR__ . '/Core/Response.php';
 
 use Core\Response;
 
@@ -34,10 +34,10 @@ $endpoint = $segments[0];
 
 // Routes spéciales à la racine de src/
 $specialRoutes = [
-    'admin_dashboard'    => __DIR__ . '/../admin_dashboard.php',
-    'employee_dashboard' => __DIR__ . '/../employee_dashboard.php',
-    'login'              => __DIR__ . '/../login.php',
-    'logout'             => __DIR__ . '/../logout.php',
+    'admin_dashboard'    => __DIR__ . '/admin_dashboard.php',
+    'employee_dashboard' => __DIR__ . '/employee_dashboard.php',
+    'login'              => __DIR__ . '/login.php',
+    'logout'             => __DIR__ . '/logout.php',
 ];
 
 // Routes API classiques

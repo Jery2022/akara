@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../db.php';
+require_once __DIR__ . '/../db.php';
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 

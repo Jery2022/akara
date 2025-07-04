@@ -1,4 +1,6 @@
 docker/
+poubelle/
+docker-compose.override.yml
 docker-compose.yml
 .env
 .env.local
@@ -6,3 +8,5 @@ docker-compose.yml
 .env.prod
 .dockerignore
 test*.php
+start-docker.*
+start-local.bat

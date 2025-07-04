@@ -5,8 +5,8 @@
         exit;
     }
 
-    require_once '../../db.php';
-    require_once 'partials/_header.php';
+    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/partials/_header.php';
 
     $pdo = getPDO();
 
@@ -76,24 +76,24 @@
         <div class="col-md-3">
             <select name="rentability" class="form-select">
                 <option value="">Toutes les rentabilités</option>
-                <option value="forte"                                                                                                                                                                                                                                                                    <?php echo($rentabilityFilter === "forte") ? 'selected' : ''; ?>>Forte</option>
-                <option value="bonne"                                                                                                                                                                                                                                                                    <?php echo($rentabilityFilter === "bonne") ? 'selected' : ''; ?>>Bonne</option>
-                <option value="faible"                                                                                                                                                                                                                                                                           <?php echo($rentabilityFilter === "faible") ? 'selected' : ''; ?>>Faible</option>
+                <option value="forte"                                                                                                                                                                                                                                                                                                         <?php echo($rentabilityFilter === "forte") ? 'selected' : ''; ?>>Forte</option>
+                <option value="bonne"                                                                                                                                                                                                                                                                                                         <?php echo($rentabilityFilter === "bonne") ? 'selected' : ''; ?>>Bonne</option>
+                <option value="faible"                                                                                                                                                                                                                                                                                                                 <?php echo($rentabilityFilter === "faible") ? 'selected' : ''; ?>>Faible</option>
             </select>
         </div>
         <div class="col-md-3">
             <select name="classification" class="form-select">
                 <option value="">Toutes les classifications</option>
-                <option value="A"                                                                                                                                                                                                                                        <?php echo($classificationFilter === "A") ? 'selected' : ''; ?>>Classification A</option>
-                <option value="B"                                                                                                                                                                                                                                        <?php echo($classificationFilter === "B") ? 'selected' : ''; ?>>Classification B</option>
-                <option value="C"                                                                                                                                                                                                                                        <?php echo($classificationFilter === "C") ? 'selected' : ''; ?>>Classification C</option>
+                <option value="A"                                                                                                                                                                                                                                                                         <?php echo($classificationFilter === "A") ? 'selected' : ''; ?>>Classification A</option>
+                <option value="B"                                                                                                                                                                                                                                                                         <?php echo($classificationFilter === "B") ? 'selected' : ''; ?>>Classification B</option>
+                <option value="C"                                                                                                                                                                                                                                                                         <?php echo($classificationFilter === "C") ? 'selected' : ''; ?>>Classification C</option>
             </select>
         </div>
 
         <div class="col-md-2">
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                                                                                                                                      <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                                                                                                                             <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                                                                                                                         <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2">

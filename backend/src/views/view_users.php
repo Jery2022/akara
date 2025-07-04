@@ -5,7 +5,8 @@
         exit;
     }
 
-    require_once '../../db.php';
+    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/partials/_header.php';
 
     $pdo = getPDO();
 
@@ -435,7 +436,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var toastBody = document.getElementById('mainToastBody');
-    toastBody.innerHTML =                                                                                                                                                                                                                                  <?php echo json_encode(strip_tags($message, '<div><br>')); ?>;
+    toastBody.innerHTML =                                                                                                                                                                                                                                                           <?php echo json_encode(strip_tags($message, '<div><br>')); ?>;
     // Change la couleur selon le type de message
     var toast = document.getElementById('mainToast');
     if (toastBody.innerHTML.includes('alert-success')) {

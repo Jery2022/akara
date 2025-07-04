@@ -5,8 +5,8 @@
         exit;
     }
 
-    require_once '../../db.php';
-    require_once 'partials/_header.php';
+    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/partials/_header.php';
 
     $pdo = getPDO();
 

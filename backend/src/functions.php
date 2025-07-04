@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/db.php';
 
 // vérification de la connexion PDO
 $pdo = getPDO();

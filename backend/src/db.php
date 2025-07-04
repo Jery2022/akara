@@ -1,14 +1,11 @@
 <?php
 
-define('BASE_PATH', __DIR__);
-//include 'bootstrap.php';
-require_once BASE_PATH . '/src/vendor/autoload.php';
-// backend/bootstrap.php
+//define('BASE_PATH', __DIR__);
 //require_once __DIR__ . '/vendor/autoload.php';
 
-$envFile = file_exists(BASE_PATH . '/.env.local') ? '.env.local' : '.env';
-$dotenv  = Dotenv\Dotenv::createImmutable(BASE_PATH, $envFile);
-$dotenv->load();
+// $envFile = file_exists(BASE_PATH . '.env.local') ? '.env.local' : '.env';
+// $dotenv  = Dotenv\Dotenv::createImmutable(BASE_PATH, $envFile);
+// $dotenv->load();
 
 function env(string $key, $default = null)
 {
