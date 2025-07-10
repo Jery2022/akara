@@ -2,3 +2,4 @@ sql/
 Documentations/
 backend/start-docker.*
 backend/start-local.*
+.env

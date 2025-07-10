@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for backend-holy-fire-1325 on 2025-06-30T15:25:01+01:00
+# fly.toml app configuration file generated for akara-prod-green-hill-9016 on 2025-07-10T00:22:11+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'backend-holy-fire-1325'
+app = 'akara-prod-green-hill-9016'
 primary_region = 'cdg'
 
 [build]

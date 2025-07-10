@@ -1,11 +1,25 @@
 <?php
 
-//define('BASE_PATH', __DIR__);
-//require_once __DIR__ . '/vendor/autoload.php';
+function loadEnv(string $envFile)
+{
+    if (! file_exists($envFile)) {
+        throw new RuntimeException("Fichier d'environnement introuvable : $envFile");
+    }
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) {
+            continue;
+        }
 
-// $envFile = file_exists(BASE_PATH . '.env.local') ? '.env.local' : '.env';
-// $dotenv  = Dotenv\Dotenv::createImmutable(BASE_PATH, $envFile);
-// $dotenv->load();
+        list($key, $value) = explode('=', $line, 2);
+        $_ENV[trim($key)]  = trim($value);
+    }
+}
+
+// Charge le bon fichier .env selon APP_ENV
+$envType = getenv('APP_ENV') ?: 'demo'; // demo, prod, local, etc.
+$envFile = __DIR__ . '/.env.' . $envType;
+loadEnv($envFile);
 
 function env(string $key, $default = null)
 {

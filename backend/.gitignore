@@ -4,8 +4,8 @@ docker-compose.override.yml
 docker-compose.yml
 .env
 .env.local
-.env.dev
-.env.prod
+.env.demo
+.env.test
 .dockerignore
 test*.php
 start-docker.*

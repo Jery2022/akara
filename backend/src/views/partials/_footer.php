@@ -17,9 +17,9 @@
 </div>
 <footer class="bg-primary text-white text-center py-3">
    <p>&copy;
-    <?php echo date("Y"); ?>Akara. Tous droits réservés.</p>
+    <?php echo date("Y"); ?>Akara 2025. Tous droits réservés.</p>
    <p>Version 1.0.0</p>
-   <p>Développé par <a href="#"  class="text-white">NovaTechnologie & Co.</a></p>
+   <p>Développé par <a href="#"  class="text-white">NovaTechnologies Sarl.</a></p>
 </footer>
 </body>
 </html>

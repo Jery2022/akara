@@ -1,5 +1,9 @@
 <?php
-    session_start();
+    // session_start();
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+
     if (! isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
         header('Location: ../login.php');
         exit;
@@ -63,14 +67,30 @@
     }
 
     // Suppression d'un utilisateur
+
     if (isset($_GET['delete'])) {
         $id = intval($_GET['delete']);
+
         if (! isset($_GET['csrf_token']) || $_GET['csrf_token'] !== $_SESSION['csrf_token']) {
             $message = '<div class="alert alert-danger">Erreur de sécurité CSRF.</div>';
         } else {
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id=?");
-            $stmt->execute([$id]);
-            $message = '<div class="alert alert-success">Utilisateur supprimé avec succès.</div>';
+            try {
+                $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                if ($stmt->execute([$id])) {
+                    if ($stmt->rowCount() > 0) {
+                        // header('Location: ../index.php?route=users&deleted=1');
+                        // exit;
+                        $message = '<div class="alert alert-success">Utilisateur supprimé avec succès.</div>';
+                    } else {
+                        $message = '<div class="alert alert-warning">Utilisateur introuvable.</div>';
+                    }
+                } else {
+                    $errorInfo = $stmt->errorInfo();
+                    $message   = '<div class="alert alert-danger">Erreur lors de la suppression : ' . $errorInfo[2] . '</div>';
+                }
+            } catch (PDOException $e) {
+                $message = '<div class="alert alert-danger">Erreur de base de données : ' . $e->getMessage() . '</div>';
+            }
         }
     }
 
@@ -156,28 +176,25 @@
 <?php require_once 'partials/_header.php'; ?>
   <title>Gestion Utilisateurs</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/public/css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
  <?php require_once 'partials/_navbar.php'; ?>
  <!-- Toast Bootstrap pour les messages -->
 <div class="position-fixed bottom-0   end-0  p-2" style="z-index: 1100">
   <div id="mainToast" class="toast align-items-center text-bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true">
-    <div class="d-flex">
-      <div class="toast-body" id="mainToastBody">
-        <!-- Le message sera injecté ici -->
-      </div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
-    </div>
+    <?php if (isset($message)): ?>
+        <div class="d-flex">
+        <div class="toast-body" id="mainToastBody">
+            <!-- Le message sera injecté ici -->
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
+        </div>
+    <?php endif; ?>
   </div>
 </div>
 <main class="container my-4">
     <h2 class="mb-4">Gestion des utilisateurs</h2>
-    <!-- <div class="alert-container">
-        <?php // if (isset($message) && ! empty($message)): ?>
-<?php         //echo $message; ?>
-<?php         //endif; ?>
-    </div> -->
 
     <!-- Bouton pour ajouter un utilisateur -->
     <div class="mb-3 mt-5">
@@ -192,37 +209,48 @@
           >Ajouter un utilisateur</button>
     </div>
     <!-- Formulaire de filtre -->
-    <form method="get" class="row mb-5 mt-3 bg-dark-subtle shadow gap-3 p-3">
-        <div class="col-md-3">
-            <select name="role" class="form-select">
-                <option value="">Tous les rôles</option>
-                <option value="admin"
-                    <?php echo($roleFilter === 'admin') ? 'selected' : ''; ?>>Admin</option>
-                <option value="employe"
-                    <?php echo($roleFilter === 'employe') ? 'selected' : ''; ?>>Employé</option>
-            </select>
-        </div>
-        <div class="col-md-3">
-            <select name="statut" class="form-select">
-                <option value="">Tous les statuts</option>
-                <option value="actif"
-                    <?php echo($statutFilter === 'actif') ? 'selected' : ''; ?>>Actif</option>
-                <option value="désactivé"
-                    <?php echo($statutFilter === 'désactivé') ? 'selected' : ''; ?>>Désactivé</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <select name="order" class="form-select">
-                <option value="ASC"
-                    <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"
-                    <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Filtrer</button>
-        </div>
-    </form>
+    <form method="get" class="row mb-5 mt-3 bg-dark-subtle shadow gap-3 p-3" action="/index.php">
+    <!-- Champ caché pour le routeur -->
+    <input type="hidden" name="route" value="users">
+
+    <div class="col-md-3">
+        <select name="role" class="form-select">
+            <option value="">Tous les rôles</option>
+            <option value="admin"                                                                                                                                                                                                                                        <?php echo($roleFilter === 'admin') ? 'selected' : '' ?>>Admin</option>
+            <option value="employe"                                                                                                                                                                                                                                                      <?php echo($roleFilter === 'employe') ? 'selected' : '' ?>>Employé</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <select name="statut" class="form-select">
+            <option value="">Tous les statuts</option>
+            <option value="actif"                                                                                                                                                                                                                                        <?php echo($statutFilter === 'actif') ? 'selected' : '' ?>>Actif</option>
+            <option value="desactive"                                                                                                                                                                                                                                                                    <?php echo($statutFilter === 'desactive') ? 'selected' : '' ?>>Désactivé</option>
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <select name="sort_by" class="form-select">
+            <option value="email"                                                                                                                                                                                                                                        <?php echo($sortBy === 'email') ? 'selected' : '' ?>>Email</option>
+            <option value="id"                                                                                                                                                                                                                   <?php echo($sortBy === 'id') ? 'selected' : '' ?>>ID</option>
+            <option value="statut"                                                                                                                                                                                                                                               <?php echo($sortBy === 'statut') ? 'selected' : '' ?>>Statut</option>
+            <option value="created_at"                                                                                                                                                                                                                                                                           <?php echo($sortBy === 'created_at') ? 'selected' : '' ?>>Date création</option>
+            <option value="role"                                                                                                                                                                                                                                 <?php echo($sortBy === 'role') ? 'selected' : '' ?>>Rôle</option>
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <select name="order" class="form-select">
+            <option value="ASC"                                                                                                                                                                                                                          <?php echo($order === 'ASC') ? 'selected' : '' ?>>Ascendant</option>
+            <option value="DESC"                                                                                                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : '' ?>>Descendant</option>
+        </select>
+    </div>
+
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Filtrer</button>
+    </div>
+</form>
+
 
 <!-- Tableau des utilisateurs -->
  <div class="table-container bg-dark-subtle shadow gap-3 p-3">
@@ -254,9 +282,11 @@ foreach ($users as $row): ?>
                     <td data-label="Rôle"><?php echo htmlspecialchars($row['role']) ?></td>
                     <td data-label="Statut"><?php echo htmlspecialchars($row['statut']) ?></td>
                     <td>
-                      <a href="?delete=<?php echo $row['id'] ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>"
+                      <a href="../index.php?route=users&delete=<?php echo intval($row['id']) ?>&csrf_token=<?php echo htmlspecialchars($_SESSION['csrf_token']) ?>"
                         class="btn btn-danger btn-sm"
-                        onclick="return confirm('Supprimer cet utilisateur ?')">Supprimer</a>
+                        onclick="return confirm('Supprimer cet utilisateur ?')"
+                        >Supprimer
+                      </a>
                       <button
                         class="btn btn-warning btn-sm"
                         data-bs-toggle="modal"
@@ -431,25 +461,25 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script> -->
 
-<!-- Affiche et fait dsiparaître le message dans toast automatiquement  -->
+<!-- Affiche et fait dsiparaître le message dans un toast automatiquement  -->
 <?php if (isset($message) && ! empty($message)): ?>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var toastBody = document.getElementById('mainToastBody');
-    toastBody.innerHTML =                                                                                                                                                                                                                                                           <?php echo json_encode(strip_tags($message, '<div><br>')); ?>;
-    // Change la couleur selon le type de message
-    var toast = document.getElementById('mainToast');
-    if (toastBody.innerHTML.includes('alert-success')) {
-        toast.classList.remove('text-bg-danger');
-        toast.classList.add('text-bg-success');
-    } else {
-        toast.classList.remove('text-bg-success');
-        toast.classList.add('text-bg-danger');
-    }
-    var bsToast = new bootstrap.Toast(toast, { delay: 4000 });
-    bsToast.show();
-});
-</script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var toastBody = document.getElementById('mainToastBody');
+            toastBody.innerHTML =                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              <?php echo json_encode(strip_tags($message, '<div><br>')); ?>;
+            // Change la couleur selon le type de message
+            var toast = document.getElementById('mainToast');
+            if (toastBody.innerHTML.includes('alert-success')) {
+                toast.classList.remove('text-bg-danger');
+                toast.classList.add('text-bg-success');
+            } else {
+                toast.classList.remove('text-bg-success');
+                toast.classList.add('text-bg-danger');
+            }
+            var bsToast = new bootstrap.Toast(toast, { delay: 4000 });
+            bsToast.show();
+        });
+    </script>
 <?php endif; ?>
 
 <?php require_once 'partials/_footer.php'; ?>
