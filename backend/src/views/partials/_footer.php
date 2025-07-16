@@ -12,7 +12,7 @@
         }
     ?>
     <a href="<?php echo htmlspecialchars($dashboardLink); ?>"
-     class="btn btn-secondary">Retour au dashboard</a>
+     class="btn btn-secondary mt-2">Retour au dashboard</a>
   </div>
 </div>
 <footer class="bg-primary text-white text-center py-3">

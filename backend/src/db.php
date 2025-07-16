@@ -17,8 +17,9 @@ function loadEnv(string $envFile)
 }
 
 // Charge le bon fichier .env selon APP_ENV
-$envType = getenv('APP_ENV') ?: 'demo'; // demo, prod, local, etc.
-$envFile = __DIR__ . '/.env.' . $envType;
+$envType = getenv('APP_ENV') ?: 'demo';      // demo, prod, local, etc.
+$envFile = __DIR__ . '/../.env.' . $envType; // à modifier selon si en local ou conteneur dockeur $envFile = __DIR__ . '.env.' . $envType
+
 loadEnv($envFile);
 
 function env(string $key, $default = null)
