@@ -1,6 +1,6 @@
 <navbar class="navbar d-flex flex-row align-items-center justify-content-between bg-primary p-3">
    <div class="d-flex align-items-center">
-      <img src="/public/images/logo-akara.jpeg" alt="Logo" class="me-2" style="width: 50px; height: 50px;">
+      <img src="/images/logo-akara.jpeg" alt="Logo" class="me-2" style="width: 50px; height: 50px;">
       <span class="h5 mb-0">Akara</span>
       </div>
       <div class="d-flex align-items-center">
