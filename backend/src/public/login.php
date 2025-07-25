@@ -1,10 +1,7 @@
 <?php
     session_start();
 
-    // error_log("CSRF token en session : " . ($_SESSION['csrf_token'] ?? 'absent'));
-    // error_log("CSRF token reçu : " . ($_POST['csrf_token'] ?? 'absent'));
-
-    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../../config/db.php';
 
     $message = '';
 

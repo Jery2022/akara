@@ -1,5 +1,22 @@
-RewriteEngine On
-RewriteCond %{REQUEST_URI} !^/login\.php$
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [QSA,L]
+# RewriteEngine On
+# RewriteCond %{REQUEST_URI} !^/login\.php$
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^ index.php [QSA,L]
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Laisser passer les fichiers statiques courants
+  RewriteCond %{REQUEST_URI} \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ [NC]
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  # Laisser passer login.php directement
+  RewriteCond %{REQUEST_URI} !^/login\.php$
+
+  # Réécrire toutes les autres requêtes vers index.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.php [QSA,L]
+</IfModule>

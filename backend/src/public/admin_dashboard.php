@@ -1,12 +1,13 @@
 <?php
     session_start();
+
     if (! isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
         header('Location: /login.php');
         exit;
     }
 
-    require_once __DIR__ . '/../db.php';
-    require_once __DIR__ . '/../functions.php';
+    require_once __DIR__ . '/../../config/db.php';
+    require_once __DIR__ . '/../../config/functions.php';
 
     $recettes = getMonthlyRecettes();
     $depenses = getMonthlyDepenses();
@@ -47,7 +48,7 @@
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-  <?php require_once __DIR__ . '/../views/partials/_navbar.php'; ?>
+  <?php require_once __DIR__ . '../../views/partials/_navbar.php'; ?>
   <div class="sidebar d-flex flex-column align-items-start">
     <h4 class="px-3 mb-1">Dashboard</h4>
     <hr class="w-100 my-2 border-light">

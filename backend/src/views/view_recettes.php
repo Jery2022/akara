@@ -11,7 +11,7 @@
         exit;
     }
 
-    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../../config/db.php';
 
     $pdo = getPDO();
 
@@ -123,7 +123,7 @@
 <?php require_once 'partials/_header.php'; ?>
 <title>Gestion des Recettes</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/../../public/css/styles.css">
 </head>
 <body>
 <?php require_once 'partials/_navbar.php'; ?>
@@ -189,8 +189,8 @@
         <div class="col-md-2">
             <label for="order"><b>Ordre :</b></label>
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                             <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2 d-flex align-items-end">

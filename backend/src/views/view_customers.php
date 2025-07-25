@@ -10,7 +10,7 @@
         exit;
     }
 
-    require_once __DIR__ . '/../db.php';
+    require_once __DIR__ . '/../../config/db.php';
 
     $pdo = getPDO();
 
@@ -134,7 +134,7 @@
         <div class="col-md-3">
             <label for="black_list"><b>Par black-list :</b></label>
             <select name="black_list" class="form-select">
-                <option value="">Tous les clients</option>                                                                                                                                                                                                                                         <?php foreach ($validBlackListOptions as $value => $label): ?>
+                <option value="">Tous les clients</option>                                                                                                                                                                                                                                                                                                   <?php foreach ($validBlackListOptions as $value => $label): ?>
                     <option value="<?php echo htmlspecialchars($value); ?>"
                         <?php echo($black_listFilter === $value) ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($label); ?>
@@ -169,8 +169,8 @@
         <div class="col-md-2">
             <label for="order"><b>Ordre :</b></label>
             <select name="order" class="form-select">
-                <option value="ASC"                                                                                                                                             <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
-                <option value="DESC"                                                                                                                                                 <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
+                <option value="ASC"                                                                                                                                                                                <?php echo($order === 'ASC') ? 'selected' : ''; ?>>Ascendant</option>
+                <option value="DESC"                                                                                                                                                                                     <?php echo($order === 'DESC') ? 'selected' : ''; ?>>Descendant</option>
             </select>
         </div>
         <div class="col-md-2 d-flex align-items-end">

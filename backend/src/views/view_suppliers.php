@@ -4,7 +4,8 @@
         header('Location: ../login.php');
         exit;
     }
-    require_once __DIR__ . '/../db.php';
+
+    require_once __DIR__ . '/../../config/db.php';
 
     $pdo = getPDO();
 
