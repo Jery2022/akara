@@ -32,78 +32,166 @@ return [
         $email    = $input['email'] ?? null;
         $password = $input['password'] ?? null;
 
-        if (! $email || ! $password) {
-            Response::badRequest('Email et mot de passe requis.');
+        // if (! $email || ! $password) {
+        //     Response::badRequest('Email et mot de passe requis.');
+        //     return;
+        // }
+
+        if (isset($input['email']) && isset($input['password'])) {
+            // Assainissement de l'email
+            $email = filter_var($email, FILTER_SANITIZE_EMAIL);
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                Response::badRequest('Format d\'email invalide.');
+                return;
+            }
+
+            try {
+                $stmt = $pdo->prepare("SELECT id, email, password, role FROM users WHERE email = ?");
+                $stmt->execute([$email]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (! $user || ! password_verify($password, $user['password'])) {
+                    Response::unauthorized('Identifiants invalides.');
+                    return;
+                }
+
+                // Récupération de la clé secrète JWT. DOIT être la même que celle utilisée pour la validation.
+                $secretKey = $_ENV['JWT_SECRET_KEY'] ?: getenv('JWT_SECRET_KEY');
+
+                // Log de débogage pour la clé secrète lors de la génération
+                error_log("[AUTH] Clé secrète pour génération JWT: " . ($secretKey ? 'DÉFINIE (taille: ' . strlen($secretKey) . ')' : 'NON DÉFINIE'));
+
+                if (empty($secretKey)) {
+                    error_log("[AUTH] Erreur: JWT_SECRET_KEY n'est pas définie pour la génération de token.");
+                    Response::error('Erreur de configuration du serveur lors de la génération du token.', 500);
+                    return;
+                }
+
+                // Définition du payload du JWT
+                $issuedAt       = time();
+                $expirationTime = $issuedAt + (60 * 60 * 24);           // Token valide 24 heures
+                $issuer         = "http://localhost:8000/backend/api/"; // Qui émet le token
+                $audience       = "http://localhost:3000";              // Pour qui le token est destiné
+
+                $payload = [
+                    'iat'  => $issuedAt,
+                    'exp'  => $expirationTime,
+                    'iss'  => $issuer,
+                    'aud'  => $audience,
+                    'data' => [
+                        'user_id' => $user['id'],
+                        'email'   => $user['email'],
+                        'role'    => $user['role'],
+                    ],
+                ];
+
+                // Encodage du JWT
+                $jwt = JWT::encode($payload, $secretKey, 'HS256');
+
+                // Réponse de succès avec le token
+                Response::json([
+                    'message' => 'Connexion réussie',
+                    'jwt'     => $jwt,
+                    'user'    => [
+                        'id'    => $user['id'],
+                        'email' => $user['email'],
+                        'role'  => $user['role'],
+                    ],
+                ]);
+
+            } catch (\PDOException $e) {
+                error_log("Erreur DB POST auth: " . $e->getMessage());
+                Response::error('Erreur interne du serveur lors de l\'authentification.', 500);
+            } catch (\Exception $e) {
+                error_log("Erreur inattendue lors de la connexion: " . $e->getMessage());
+                Response::error('Une erreur inattendue est survenue.', 500);
+            }
+        } else {
+            // Si POST sans email/password, c'est une Bad Request
+            Response::badRequest('Email et mot de passe requis pour la connexion.');
+        }
+    },
+
+    'GET'  => function () {
+        // CETTE SECTION EST CELLE QUI EST APPELÉE PAR VOTRE useEffect `checkAuth`
+        // Elle s'attend à trouver le token dans l'en-tête Authorization.
+
+        header("Content-Type: application/json");
+        header("Access-Control-Allow-Origin: http://localhost:3000");
+        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(204);
+            exit;
+        }
+
+        $pdo = getPDO();
+        if (! $pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
-        // Assainissement de l'email
-        $email = filter_var($email, FILTER_SANITIZE_EMAIL);
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            Response::badRequest('Format d\'email invalide.');
+        // Récupérer le token de l'en-tête Authorization
+        $token = null;
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+            if (preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+                $token = $matches[1];
+            }
+        }
+
+        if (! $token) {
+            // Si aucun token, renvoyer Unauthorized (ce qui est normal si l'utilisateur n'est pas connecté)
+            Response::unauthorized('Aucun token d\'authentification fourni dans l\'en-tête Authorization.');
+            return;
+        }
+
+        // --- Logique de validation du token JWT ---
+        $secretKey = $_ENV['JWT_SECRET_KEY'] ?: getenv('JWT_SECRET_KEY');
+        if (empty($secretKey)) {
+            error_log("[AUTH] Erreur: JWT_SECRET_KEY non définie pour la validation de token.");
+            Response::error('Erreur de configuration du serveur.', 500);
             return;
         }
 
         try {
+            // Décoder et valider le token
+            $decoded = JWT::decode($token, new \Firebase\JWT\Key($secretKey, 'HS256'));
+
+            // Récupérer les données de l'utilisateur du payload du token
+            $user_id = $decoded->data->user_id;
+            $email   = $decoded->data->email;
+            $role    = $decoded->data->role;
+
+            // ... autres données comme email, role ...
+
+            // Optionnel: vérifier si l'utilisateur existe toujours en base de données
+            // ... votre code de vérification DB ...
             $stmt = $pdo->prepare("SELECT id, email, password, role FROM users WHERE email = ?");
             $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (! $user || ! password_verify($password, $user['password'])) {
-                Response::unauthorized('Identifiants invalides.');
+            if (! $user || $user['email'] !== $email || $user['role'] !== $role) {
+                Response::unauthorized('Informations utilisateur obsolètes ou invalides. Veuillez vous reconnecter.');
                 return;
             }
 
-            // Récupération de la clé secrète JWT. DOIT être la même que celle utilisée pour la validation.
-            $secretKey = $_ENV['JWT_SECRET_KEY'] ?: getenv('JWT_SECRET_KEY');
-
-            // Log de débogage pour la clé secrète lors de la génération
-            error_log("[AUTH] Clé secrète pour génération JWT: " . ($secretKey ? 'DÉFINIE (taille: ' . strlen($secretKey) . ')' : 'NON DÉFINIE'));
-
-            if (empty($secretKey)) {
-                error_log("[AUTH] Erreur: JWT_SECRET_KEY n'est pas définie pour la génération de token.");
-                Response::error('Erreur de configuration du serveur lors de la génération du token.', 500);
-                return;
-            }
-
-            // Définition du payload du JWT
-            $issuedAt       = time();
-            $expirationTime = $issuedAt + (60 * 60 * 24);   // Token valide 24 heures
-            $issuer         = "http://localhost:8000/api/"; // Qui émet le token
-            $audience       = "http://localhost:3000";      // Pour qui le token est destiné
-
-            $payload = [
-                'iat'  => $issuedAt,
-                'exp'  => $expirationTime,
-                'iss'  => $issuer,
-                'aud'  => $audience,
-                'data' => [
-                    'user_id' => $user['id'],
-                    'email'   => $user['email'],
-                    'role'    => $user['role'],
-                ],
-            ];
-
-            // Encodage du JWT
-            $jwt = JWT::encode($payload, $secretKey, 'HS256');
-
-            // Réponse de succès avec le token
             Response::json([
-                'message' => 'Connexion réussie',
-                'jwt'     => $jwt,
+                'message' => 'Session valide',
                 'user'    => [
-                    'id'    => $user['id'],
-                    'email' => $user['email'],
-                    'role'  => $user['role'],
+                    'id'    => $user_id,
+                    'email' => $decoded->data->email,
+                    'role'  => $decoded->data->role,
                 ],
             ]);
 
-        } catch (\PDOException $e) {
-            error_log("Erreur DB POST auth: " . $e->getMessage());
-            Response::error('Erreur interne du serveur lors de l\'authentification.', 500);
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            Response::unauthorized('Votre session a expiré. Veuillez vous reconnecter.');
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            Response::unauthorized('Token d\'authentification invalide.');
         } catch (\Exception $e) {
-            error_log("Erreur inattendue lors de la connexion: " . $e->getMessage());
-            Response::error('Une erreur inattendue est survenue.', 500);
+            Response::unauthorized('Erreur lors de la validation du token.');
         }
     },
 ];

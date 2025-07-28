@@ -1,6 +1,47 @@
 <?php
 // backend/api/index.php
 
+// Active l'affichage des erreurs PHP (utile en développement)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// 1. Définir l'origine autorisée (votre frontend React)
+// EN DÉVELOPPEMENT: Mettre l'URL exacte de votre frontend React
+header("Access-Control-Allow-Origin: http://localhost:3000");
+
+// EN PRODUCTION: Remplacez par votre domaine réel de production, ou gérez les multiples origines avec prudence
+// $allowed_origins = ['https://votre-domaine-frontend.com', 'http://localhost:3000'];
+// if (isset($_SERVER['HTTP_ORIGIN']) && in_array($_SERVER['HTTP_ORIGIN'], $allowed_origins)) {
+//     header("Access-Control-Allow-Origin: " . $_SERVER['HTTP_ORIGIN']);
+// } else {
+//     // Si l'origine n'est pas autorisée, refuser l'accès ou envoyer une origine par défaut non permissive
+//     header("Access-Control-Allow-Origin: http://localhost:3000"); // Ou une URL non valide pour bloquer
+// }
+
+// 2. Définir les méthodes HTTP autorisées
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+
+// 3. Définir les en-têtes qui peuvent être envoyés par le client
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+
+// 4. Autoriser l'envoi de cookies et d'identifiants (très important car votre React utilise credentials: 'include')
+header("Access-Control-Allow-Credentials: true");
+
+// 5. Définir la durée de validité du preflight (en secondes)
+header("Access-Control-Max-Age: 86400"); // Cache la réponse preflight pendant 24 heures
+
+// 6. Gérer la requête OPTIONS (le "preflight" du navigateur)
+// Si la requête est de type OPTIONS, nous avons juste besoin d'envoyer les en-têtes CORS
+// et de terminer l'exécution du script, car il s'agit d'une vérification préalable.
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200); // Répondre avec un statut 200 OK
+    exit();                  // Terminer le script ici
+}
+
+// 7. Définir le type de contenu de la réponse pour les requêtes réelles (si votre API renvoie du JSON)
+header("Content-Type: application/json");
+
 // Votre autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
     // Convertit le namespace en chemin de fichier (ex: Core\Response -> Core/Response.php)
@@ -163,6 +204,3 @@ if (! empty($endpoint)) {
     // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/),
     Response::json(['message' => 'Bienvenue sur votre API RESTful !', 'version' => '1.0'], 200);
 }
-
-// Le script s'arrêtera ici si aucune des fonctions Response::* n'a été appelée plus tôt.
-// (Normalement, une réponse est toujours envoyée avant d'atteindre cette ligne.)

@@ -17,7 +17,6 @@ import VentesTab from './components/VentesTab';
 import FacturesTab from './components/FacturesTab';
 import QuittancesTab from './components/QuittancesTab';
 import { MoonIcon, SunIcon } from './components/Icon';
-import ToastContainer from './components/ToastContainer';
 import { ToastProvider, useToast } from './components/ToastProvider';
 import './App.css'; // Import global styles
 //import './tailwind.css'; // Import Tailwind CSS styles
@@ -28,7 +27,10 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
-  const { addToast, removeToast } = useToast();
+  const { addToast } = useToast();
+
+  // URL de l'API backend
+  const API_URL = 'http://localhost:8000/backend/api';
 
   useEffect(() => {
     // Vérification du mode sombre dans les préférences utilisateur
@@ -40,29 +42,74 @@ export default function App() {
 
   // Vérification de l'authentification persistante
   useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     async function checkAuth() {
+      setLoading(true); // Activez le loading au début de la vérification
+
+      // récupération du token d'authentification
+      const token = localStorage.getItem('authToken');
+
+      if (!token) {
+        // Si pas de token, pas besoin d'appeler le backend, l'utilisateur n'est pas authentifié
+        setUser(null);
+        setLoading(false); // Désactivez le loading
+        return; // Sortir de la fonction
+      }
+
       try {
-        const res = await fetch(`${API_URL}/index.php?route=checkAuth`, {
-          credentials: 'include',
+        const res = await fetch(`${API_URL}/auth`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          signal: signal,
         });
+
         if (res.ok) {
           const data = await res.json();
           setUser(data.user || null);
+          addToast('Session restaurée!', 'info'); // Indique que la session a été récupérée
         } else {
+          // Si le backend renvoie 401 ou autre erreur (token invalide/expiré)
+          console.log(
+            'Token invalide ou session expirée, veuillez vous reconnecter.'
+          );
+          addToast(
+            'Votre session a expiré. Veuillez vous reconnecter.',
+            'warning'
+          ); // Informez l'utilisateur
+
+          // Si le token est invalide ou expiré, supprimons-le du localStorage
+          localStorage.removeItem('authToken');
           setUser(null);
         }
       } catch (err) {
-        console.error(
-          "Erreur lors de la vérification de l'authentification :",
-          err
-        );
+        if (err.name === 'AbortError') {
+          console.log('Fetch aborted');
+        } else {
+          console.error(
+            "Erreur lors de la vérification de l'authentification :",
+            err
+          );
+          localStorage.removeItem('authToken'); // Nettoyage en cas d'erreur réseau
+          setUser(null);
+          addToast(
+            'Erreur de connexion au serveur. Veuillez réessayer.',
+            'danger'
+          );
+        }
+      } finally {
+        setLoading(false); // Toujours désactiver le loading à la fin
       }
     }
     checkAuth();
-  }, []);
-
-  // URL de l'API backend
-  const API_URL = 'https://akara-prod-green-hill-9016.fly.dev/'; // Remplacez par l'URL de votre API
+    return () => {
+      controller.abort(); // Annule la requête si le composant est démonté
+    };
+  }, [addToast]);
 
   // Données locales avant connexion au backend
   const [stockItems, setStockItems] = useState([]);
@@ -90,8 +137,15 @@ export default function App() {
   }, [darkMode]);
 
   // Chargement initial optimisé (parallélisé)
+
   useEffect(() => {
     async function fetchAll() {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        // Gérer le cas où l'utilisateur n'est pas connecté
+        return;
+      }
+
       try {
         const routes = [
           'stock',
@@ -126,8 +180,12 @@ export default function App() {
           quittances,
         ] = await Promise.all(
           routes.map(async (route) => {
-            const res = await fetch(`${API_URL}/index.php?route=${route}`, {
-              credentials: 'include',
+            const res = await fetch(`${API_URL}/${route}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
             });
             if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
             return await res.json();
@@ -159,6 +217,7 @@ export default function App() {
   }, [user, API_URL, addToast]);
 
   // Authentification serveur
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -166,12 +225,10 @@ export default function App() {
     const form = e.target;
     const email = form.elements.email.value;
     const password = form.elements.password.value;
-
     try {
-      const res = await fetch(`${API_URL}/index.php?route=login`, {
+      const res = await fetch(`${API_URL}/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
@@ -182,26 +239,31 @@ export default function App() {
         return;
       }
       const data = await res.json();
+      const token = data.jwt;
+      localStorage.setItem('authToken', token); // sauvegarde du token dans localStorage
+
+      // Mettre à jour l'état de l'utilisateur
       setUser(data.user || { name: email });
       setLoading(false);
+      addToast('Connexion réussie!', 'success');
     } catch (err) {
       const errorMsg = 'Erreur serveur';
       setAuthError(errorMsg);
-      addToast(errorMsg, 'error'); // <-- Ajout du toast ici aussi
+      addToast(errorMsg, 'error');
       setLoading(false);
     }
   };
 
   // Déconnexion
   const handleLogout = async () => {
-    try {
-      await fetch(`${API_URL}/index.php?route=logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (err) {
-      // ignore erreur logout
-    }
+    // try {
+    //   await fetch(`${API_URL}/index.php?route=logout`, {
+    //     method: 'POST',
+    //   });
+    // } catch (err) {
+    //   // ignore erreur logout
+    // }
+    localStorage.removeItem('authToken');
     setUser(null);
   };
 
@@ -311,105 +373,103 @@ export default function App() {
               <StockManagementTab
                 items={stockItems}
                 setItems={setStockItems}
-                api={`${API_URL}/index.php?route=stock`}
+                api={`${API_URL}/stock`}
               />
             )}
             {activeTab === 'employees' && (
               <EmployeesTab
                 employees={employees}
                 setEmployees={setEmployees}
-                api={`${API_URL}/index.php?route=employees`}
+                api={`${API_URL}/employees`}
               />
             )}
             {activeTab === 'suppliers' && (
               <SuppliersTab
                 suppliers={suppliers}
                 setSuppliers={setSuppliers}
-                api={`${API_URL}/index.php?route=suppliers`}
+                api={`${API_URL}/suppliers`}
               />
             )}
             {activeTab === 'customers' && (
               <CustomersTab
                 customers={customers}
                 setCustomers={setCustomers}
-                api={`${API_URL}/index.php?route=customers`}
+                api={`${API_URL}/customers`}
               />
             )}
             {activeTab === 'payments' && (
               <PaymentsTab
                 payments={payments}
                 setPayments={setPayments}
-                api={`${API_URL}/index.php?route=payments`}
+                api={`${API_URL}/payments`}
               />
             )}
             {activeTab === 'produits' && (
               <ProduitsTab
                 products={produits}
                 setProduits={setProduits}
-                api={`${API_URL}/index.php?route=produits`}
+                api={`${API_URL}/produits`}
               />
             )}
             {activeTab === 'contrats' && (
               <ContratsTab
                 contracts={contrats}
                 setContrats={setContrats}
-                api={`${API_URL}/index.php?route=contrats`}
+                api={`${API_URL}/contrats`}
               />
             )}
             {activeTab === 'entrepots' && (
               <EntrepotsTab
                 entrepots={entrepots}
                 setEntrepots={setEntrepots}
-                api={`${API_URL}/index.php?route=entrepots`}
+                api={`${API_URL}/entrepots`}
               />
             )}
             {activeTab === 'recettes' && (
               <RecettesTab
                 recettes={recettes}
                 setRecettes={setRecettes}
-                api={`${API_URL}/index.php?route=recettes`}
+                api={`${API_URL}/recettes`}
               />
             )}
             {activeTab === 'depenses' && (
               <DepensesTab
                 depenses={depenses}
                 setDepenses={setDepenses}
-                api={`${API_URL}/index.php?route=depenses`}
+                api={`${API_URL}/depenses`}
               />
             )}
             {activeTab === 'achats' && (
               <AchatsTab
                 achats={achats}
                 setAchats={setAchats}
-                api={`${API_URL}/index.php?route=achats`}
+                api={`${API_URL}/achats`}
               />
             )}
             {activeTab === 'ventes' && (
               <VentesTab
                 ventes={ventes}
                 setVentes={setVentes}
-                api={`${API_URL}/index.php?route=ventes`}
+                api={`${API_URL}/ventes`}
               />
             )}
             {activeTab === 'factures' && (
               <FacturesTab
                 factures={factures}
                 setFactures={setFactures}
-                api={`${API_URL}/index.php?route=factures`}
+                api={`${API_URL}/factures`}
               />
             )}
             {activeTab === 'quittances' && (
               <QuittancesTab
                 quittances={quittances}
                 setQuittances={setQuittances}
-                api={`${API_URL}/index.php?route=quittances`}
+                api={`${API_URL}/quittances`}
               />
             )}
           </main>
         </div>
       </div>
-      <ToastContainer toasts={addToast} removeToast={removeToast} />
-      {/* <ToastContainer toasts={toasts} removeToast={removeToast} />  afficher un message d'erreur si nécessaire */}
     </ToastProvider>
   );
 }
