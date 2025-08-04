@@ -1,33 +1,33 @@
 import React, { useState, useEffect } from 'react';
 
-function EditContractModal({ contract, onClose, onSave }) {
-  const [editedContract, setEditedContract] = useState(contract);
+function EditEmployeeModal({ employee, onClose, onSave }) {
+  const [editedEmployee, setEditedEmployee] = useState(employee);
 
-  // Met à jour l'état local si le contrat prop change (utile si la modale reste ouverte)
   useEffect(() => {
-    setEditedContract(contract);
-  }, [contract]);
+    setEditedEmployee(employee);
+  }, [employee]);
 
+  // Gère les changements dans les champs du formulaire et met à jour l'état local.
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setEditedContract((prev) => ({
+    setEditedEmployee((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
+  // Gère la soumission du formulaire. 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Appelle la fonction onSave passée par le parent avec les données modifiées
-    onSave(editedContract);
+    // Appelle la fonction 'onSave' passée par le composant parent avec les données modifiées.
+    onSave(editedEmployee);
   };
 
-  // Styles Tailwind CSS pour la modale
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-11/12 md:w-2/3 lg:w-1/2 relative">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Modifier le contrat : {contract.name}
+          Modifier l'employé : {employee.name}
         </h2>
         <button
           onClick={onClose}
@@ -50,7 +50,7 @@ function EditContractModal({ contract, onClose, onSave }) {
               type="text"
               id="name"
               name="name"
-              value={editedContract.name}
+              value={editedEmployee.name}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
@@ -58,16 +58,16 @@ function EditContractModal({ contract, onClose, onSave }) {
           </div>
           <div>
             <label
-              htmlFor="objet"
+              htmlFor="fonction"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Objet
+              Fonction de l'employé
             </label>
             <input
               type="text"
-              id="objet"
-              name="objet"
-              value={editedContract.objet}
+              id="fonction"
+              name="fonction"
+              value={editedEmployee.fonction}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
@@ -75,88 +75,99 @@ function EditContractModal({ contract, onClose, onSave }) {
           </div>
           <div>
             <label
-              htmlFor="start_date"
+              htmlFor="salary"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Date de début
-            </label>
-            <input
-              type="date"
-              id="start_date"
-              name="start_date"
-              value={editedContract.start_date}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="end_date"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Date de fin
-            </label>
-            <input
-              type="date"
-              id="end_date"
-              name="end_date"
-              value={editedContract.end_date}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="sign_date"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Date de signature
-            </label>
-            <input
-              type="date"
-              id="sign_date"
-              name="sign_date"
-              value={editedContract.sign_date}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="type"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Type de contrat
-            </label>
-            <input
-              type="text"
-              id="type"
-              name="type"
-              value={editedContract.type}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              required
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="amount"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              Montant
+              Salaire de l'employé
             </label>
             <input
               type="number"
-              id="amount"
-              name="amount"
-              value={editedContract.amount}
+              id="salary"
+              name="salary"
+              value={editedEmployee.salary}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
             />
+          </div>
+          <div>
+            <label
+              htmlFor="phone"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Téléphone
+            </label>
+            <input
+              type="text"
+              id="phone"
+              name="phone"
+              value={editedEmployee.phone} 
+              onChange={handleChange}
+              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              required
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={editedEmployee.email}
+              onChange={handleChange}
+              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              required
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="quality"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Qualité de l'employé
+            </label>
+            <select
+              id="quality"
+              name="quality"
+              value={editedEmployee.quality}
+              onChange={handleChange}
+              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              required
+            >
+              <option value="">Sélectionner une qualité</option> {/* Ajouté */}
+              <option value="ouvrier">Ouvrier</option>
+              <option value="technicien">Technicien</option>
+              <option value="ingénieur">Ingénieur</option>
+              <option value="ceo">Dirigeant</option>
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="category"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Catégorie de l'employé
+            </label>
+            <select
+              id="category"
+              name="category"
+              value={editedEmployee.category}
+              onChange={handleChange}
+              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              required
+            >
+              <option value="">Sélectionner une catégorie</option>{' '}
+              {/* Ajouté */}
+              <option value="agent">Agent</option>
+              <option value="agent de maitrise">Agent de maîtrise</option>
+              <option value="cadre">Cadre</option>
+              <option value="cadre supérieur">Cadre supérieur</option>
+            </select>
           </div>
           <div className="md:col-span-2 flex justify-end gap-3 mt-4">
             <button
@@ -179,4 +190,4 @@ function EditContractModal({ contract, onClose, onSave }) {
   );
 }
 
-export default EditContractModal;
+export default EditEmployeeModal;

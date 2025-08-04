@@ -1,196 +1,301 @@
 <?php
+// backend/api/routes/contrats.php
+
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+use Core\Response;
 
-function isAuthenticated()
-{
-    $headers = getallheaders();
-    if (! isset($headers['Authorization'])) {
-        return false;
-    }
+// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-    $authHeader = $headers['Authorization'];
-    if (strpos($authHeader, 'Bearer ') !== 0) {
-        return false;
-    }
-
-    $jwt        = trim(str_replace('Bearer ', '', $authHeader));
-    $secret_key = env('JWT_SECRET_KEY');
-
-    try {
-        $decoded = JWT::decode($jwt, new Key($secret_key, 'HS256'));
-        return $decoded;
-    } catch (Exception $e) {
-        return false;
-    }
+// Gestion des requêtes OPTIONS (preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204); // No Content
+    exit;
 }
 
+$pdo = getPDO();
+
 return [
-    'GET'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET : Récupérer tous les contrats ---
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
-        $stmt  = $pdo->query("SELECT * FROM contrats");
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($items);
-        exit;
+        try {
+            $stmt = $pdo->query("SELECT * FROM contrats ORDER BY date_debut DESC");
+            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            Response::success('Contrats récupérés avec succès.', $items);
+        } catch (PDOException $e) {
+            error_log('Error fetching contrats: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des contrats.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'POST'   => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET_ID : Récupérer un contrat spécifique ---
+    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de contrat invalide ou manquant.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM contrats WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $contrat = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$contrat) {
+                Response::notFound('Contrat non trouvé.');
+                return;
+            }
+            Response::success('Contrat récupéré avec succès.', $contrat);
+        } catch (PDOException $e) {
+            error_log('Error fetching single contrat: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération du contrat.', 500, ['details' => $e->getMessage()]);
+        }
+    },
+
+    // --- Méthode POST : Créer un nouveau contrat ---
+    'POST' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['ref'], $data['objet'], $data['date_debut'], $data['date_fin'], $data['montant'], $data['type'], $data['date_signature'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
-        }
-        $status          = $data['status'] ?? 'en cours';
-        $signataire      = $data['signataire'] ?? null;
-        $fichier_contrat = $data['fichier_contrat'] ?? null;
 
-        $stmt = $pdo->prepare("INSERT INTO contrats (ref, objet, date_debut, date_fin, status, montant, signataire, date_signature, fichier_contrat, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        if (! $stmt) {
-            echo json_encode(['error' => 'Erreur lors de la préparation']);
-            exit;
+        // Champs obligatoires
+        $requiredFields = ['ref', 'objet', 'date_debut', 'date_fin', 'montant', 'date_signature', 'type'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire.");
+                return;
+            }
         }
-        $stmt->execute([
-            $data['ref'],
-            $data['objet'],
-            $data['date_debut'],
-            $data['date_fin'],
-            $status,
-            $data['montant'],
-            $signataire,
-            $data['date_signature'],
-            $fichier_contrat,
-            $data['type'],
-        ]);
-        echo json_encode([
-            'success' => true,
-            'id'      => $pdo->lastInsertId(),
-            'message' => 'Contrat ajouté avec succès',
-        ]);
-        exit;
+        
+        // Validation des données
+        if (!is_numeric($data['montant']) || $data['montant'] <= 0) {
+            Response::badRequest("Le champ 'montant' doit être un nombre positif.");
+            return;
+        }
+
+        $allowedTypes = ['client', 'fournisseur', 'employe'];
+        if (!in_array($data['type'], $allowedTypes)) {
+            Response::badRequest("Le champ 'type' doit être 'client', 'fournisseur' ou 'employe'.");
+            return;
+        }
+
+        // Les dates doivent être au bon format
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date_debut'])) {
+            Response::badRequest("Le format de 'date_debut' est invalide. Utilisez AAAA-MM-JJ.");
+            return;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date_fin'])) {
+            Response::badRequest("Le format de 'date_fin' est invalide. Utilisez AAAA-MM-JJ.");
+            return;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date_signature'])) {
+            Response::badRequest("Le format de 'date_signature' est invalide. Utilisez AAAA-MM-JJ.");
+            return;
+        }
+        
+        try {
+            $sql = "INSERT INTO contrats (ref, objet, date_debut, date_fin, status, montant, signataire, date_signature, fichier_contrat, type) 
+                    VALUES (:ref, :objet, :date_debut, :date_fin, :status, :montant, :signataire, :date_signature, :fichier_contrat, :type)";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':ref'              => $data['ref'],
+                ':objet'            => $data['objet'],
+                ':date_debut'       => $data['date_debut'],
+                ':date_fin'         => $data['date_fin'],
+                ':status'           => $data['status'] ?? 'en cours', // Utilise la valeur par défaut si non fournie
+                ':montant'          => (float) $data['montant'],
+                ':signataire'       => $data['signataire'] ?? null,
+                ':date_signature'   => $data['date_signature'],
+                ':fichier_contrat'  => $data['fichier_contrat'] ?? null,
+                ':type'             => $data['type'],
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            Response::created('Contrat ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+        } catch (PDOException $e) {
+            error_log('Error creating contrat: ' . $e->getMessage());
+            Response::error('Erreur lors de la création du contrat.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'PUT'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode PUT_ID : Modifier un contrat spécifique ---
+    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de contrat invalide ou manquant.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['id'], $data['ref'], $data['objet'], $data['date_debut'], $data['date_fin'], $data['montant'], $data['type'], $data['date_signature'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
-        }
-        $status          = $data['status'] ?? 'en cours';
-        $signataire      = $data['signataire'] ?? null;
-        $fichier_contrat = $data['fichier_contrat'] ?? null;
 
-        $stmt = $pdo->prepare("UPDATE contrats SET ref=?, objet=?, date_debut=?, date_fin=?, status=?, montant=?, signataire=?, date_signature=?, fichier_contrat=?, type=? WHERE id=?");
-        if (! $stmt) {
-            echo json_encode(['error' => 'Erreur lors de la préparation']);
-            exit;
+        // Champs obligatoires pour la mise à jour
+        $requiredFields = ['ref', 'objet', 'date_debut', 'date_fin', 'montant', 'date_signature', 'type'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
+                return;
+            }
         }
-        $stmt->execute([
-            $data['ref'],
-            $data['objet'],
-            $data['date_debut'],
-            $data['date_fin'],
-            $status,
-            $data['montant'],
-            $signataire,
-            $data['date_signature'],
-            $fichier_contrat,
-            $data['type'],
-            $data['id'],
-        ]);
-        echo json_encode([
-            'success' => true,
-            'message' => 'Contrat modifié avec succès',
-        ]);
-        exit;
+
+        // Validation des données
+        if (!is_numeric($data['montant']) || $data['montant'] <= 0) {
+            Response::badRequest("Le champ 'montant' doit être un nombre positif.");
+            return;
+        }
+
+        $allowedTypes = ['client', 'fournisseur', 'employe'];
+        if (!in_array($data['type'], $allowedTypes)) {
+            Response::badRequest("Le champ 'type' doit être 'client', 'fournisseur' ou 'employe'.");
+            return;
+        }
+
+        // Les dates doivent être au bon format
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date_debut'])) {
+            Response::badRequest("Le format de 'date_debut' est invalide. Utilisez AAAA-MM-JJ.");
+            return;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date_fin'])) {
+            Response::badRequest("Le format de 'date_fin' est invalide. Utilisez AAAA-MM-JJ.");
+            return;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['date_signature'])) {
+            Response::badRequest("Le format de 'date_signature' est invalide. Utilisez AAAA-MM-JJ.");
+            return;
+        }
+
+        try {
+            $sql = "UPDATE contrats SET 
+                        ref = :ref, 
+                        objet = :objet, 
+                        date_debut = :date_debut, 
+                        date_fin = :date_fin,
+                        status = :status,
+                        montant = :montant,
+                        signataire = :signataire,
+                        date_signature = :date_signature,
+                        fichier_contrat = :fichier_contrat,
+                        type = :type
+                    WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':ref'              => $data['ref'],
+                ':objet'            => $data['objet'],
+                ':date_debut'       => $data['date_debut'],
+                ':date_fin'         => $data['date_fin'],
+                ':status'           => $data['status'] ?? 'en cours',
+                ':montant'          => (float) $data['montant'],
+                ':signataire'       => $data['signataire'] ?? null,
+                ':date_signature'   => $data['date_signature'],
+                ':fichier_contrat'  => $data['fichier_contrat'] ?? null,
+                ':type'             => $data['type'],
+                ':id'               => $id,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de mise à jour.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Contrat non trouvé avec l\'ID spécifié ou aucune modification effectuée.');
+                return;
+            }
+
+            Response::success('Contrat modifié avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error updating contrat: ' . $e->getMessage());
+            Response::error('Erreur lors de la modification du contrat.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'DELETE' => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode DELETE_ID : Supprimer un contrat spécifique ---
+    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode([
-                'error' => 'Échec de la connexion à la base de données',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de contrat invalide ou manquant.');
+            return;
         }
 
-        $id = intval($_GET['id'] ?? 0);
-        if (! $id) {
-            echo json_encode(['error' => 'ID manquant']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
-        $stmt = $pdo->prepare("DELETE FROM contrats WHERE id = ?");
-        if (! $stmt) {
-            echo json_encode([
-                'error' => 'Erreur lors de la préparation',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+
+        try {
+            $sql = "DELETE FROM contrats WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([':id' => $id]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Contrat non trouvé avec l\'ID spécifié.');
+                return;
+            }
+
+            Response::success('Contrat supprimé avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error deleting contrat: ' . $e->getMessage());
+            Response::error('Erreur lors de la suppression du contrat.', 500, ['details' => $e->getMessage()]);
         }
-        $stmt->execute([$id]);
-        echo json_encode([
-            'success' => true,
-            'message' => 'Contrat supprimé avec succès',
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-        exit;
     },
 ];
-// Ferme la connexion à la base de données
-$pdo = null;

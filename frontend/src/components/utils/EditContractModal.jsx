@@ -1,19 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function CreateContractModal({ onClose, onSave }) {
-  const [newContract, setNewContract] = useState({
-    name: '',
-    objet: '',
-    start_date: '',
-    end_date: '',
-    sign_date: '',
-    type: '',
-    amount: '',
-  });
+function EditContractModal({ contract, onClose, onSave }) {
+  const [editedContract, setEditedContract] = useState(contract);
+
+  // Met à jour l'état local si le contrat prop change (utile si la modale reste ouverte)
+  useEffect(() => {
+    setEditedContract(contract);
+  }, [contract]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setNewContract((prev) => ({
+    const { name, value } = e.target; 
+    setEditedContract((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -21,29 +18,16 @@ function CreateContractModal({ onClose, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    // Validation simple des champs
-    if (
-      !newContract.name ||
-      !newContract.objet ||
-      !newContract.start_date ||
-      !newContract.end_date ||
-      !newContract.sign_date ||
-      !newContract.type ||
-      !newContract.amount
-    ) {
-      alert('Veuillez remplir tous les champs du nouveau contrat.');
-      return;
-    }
-
-    onSave(newContract); // Appelle la fonction onSave du parent avec les nouvelles données
+    // Appelle la fonction onSave passée par le parent avec les données modifiées
+    onSave(editedContract);
   };
 
+  // Styles Tailwind CSS pour la modale 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-11/12 md:w-2/3 lg:w-1/2 relative">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Ajouter un nouveau contrat
+          Modifier le contrat : {contract.ref}
         </h2>
         <button
           onClick={onClose}
@@ -57,19 +41,18 @@ function CreateContractModal({ onClose, onSave }) {
         >
           <div>
             <label
-              htmlFor="name"
+              htmlFor="ref"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Libellé
             </label>
             <input
               type="text"
-              id="name"
-              name="name"
-              value={newContract.name}
+              id="ref"
+              name="ref"
+              value={editedContract.ref}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              placeholder="Libellé du contrat"
               required
             />
           </div>
@@ -84,25 +67,24 @@ function CreateContractModal({ onClose, onSave }) {
               type="text"
               id="objet"
               name="objet"
-              value={newContract.objet}
+              value={editedContract.objet}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              placeholder="Objet du contrat"
               required
             />
           </div>
           <div>
             <label
-              htmlFor="start_date"
+              htmlFor="date_debut"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Date de début
             </label>
             <input
               type="date"
-              id="start_date"
-              name="start_date"
-              value={newContract.start_date}
+              id="date_debut"
+              name="date_debut"
+              value={editedContract.date_debut}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
@@ -110,16 +92,16 @@ function CreateContractModal({ onClose, onSave }) {
           </div>
           <div>
             <label
-              htmlFor="end_date"
+              htmlFor="date_fin"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Date de fin
             </label>
             <input
               type="date"
-              id="end_date"
-              name="end_date"
-              value={newContract.end_date}
+              id="date_fin"
+              name="date_fin"
+              value={editedContract.date_fin}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
@@ -127,16 +109,16 @@ function CreateContractModal({ onClose, onSave }) {
           </div>
           <div>
             <label
-              htmlFor="sign_date"
+              htmlFor="date_signature"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Date de signature
             </label>
             <input
               type="date"
-              id="sign_date"
-              name="sign_date"
-              value={newContract.sign_date}
+              id="date_signature"
+              name="date_signature"
+              value={editedContract.date_signature}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
@@ -149,28 +131,56 @@ function CreateContractModal({ onClose, onSave }) {
             >
               Type de contrat
             </label>
-            <input
-              type="text"
+            <select
               id="type"
               name="type"
-              value={newContract.type}
+              value={editedContract.type}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
-            />
+            >
+              <option value="">Sélectionner un type</option>
+              {editedContract.status}
+              {/* Option par défaut */}
+              <option value="client">Client</option>
+              <option value="fournisseur">Fournisseur</option>
+              <option value="employe">Employé</option>
+            </select>
           </div>
           <div>
             <label
-              htmlFor="amount"
+              htmlFor="status"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Statut du contrat
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={editedContract.status}
+              onChange={handleChange}
+              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              required
+            >
+              <option value="">Sélectionner un status</option>{' '}
+              {/* Option par défaut */}
+              <option value="en cours">En cours</option>
+              <option value="terminé">Terminé</option>
+              <option value="annulé">Annulé</option>
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="montant"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Montant
             </label>
             <input
               type="number"
-              id="amount"
-              name="amount"
-              value={newContract.amount}
+              id="montant"
+              name="montant"
+              value={editedContract.montant}
               onChange={handleChange}
               className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
               required
@@ -188,7 +198,7 @@ function CreateContractModal({ onClose, onSave }) {
               type="submit"
               className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-md shadow-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:bg-emerald-700 dark:hover:bg-emerald-800"
             >
-              Créer le contrat
+              Sauvegarder les modifications
             </button>
           </div>
         </form>
@@ -197,4 +207,4 @@ function CreateContractModal({ onClose, onSave }) {
   );
 }
 
-export default CreateContractModal;
+export default EditContractModal;

@@ -1,170 +1,338 @@
 <?php
+// backend/api/routes/quittances.php
+
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+use Core\Response;
+// Les classes JWT ne sont pas utilisées directement ici si l'authentification est gérée par le routeur
 
-function isAuthenticated()
-{
-    $headers = getallheaders();
-    if (! isset($headers['Authorization'])) {
-        return false;
-    }
+// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"); // Ajout de OPTIONS
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-    $authHeader = $headers['Authorization'];
-    if (strpos($authHeader, 'Bearer ') !== 0) {
-        return false;
-    }
-
-    $jwt        = trim(str_replace('Bearer ', '', $authHeader));
-    $secret_key = env('JWT_SECRET_KEY');
-
-    try {
-        $decoded = JWT::decode($jwt, new Key($secret_key, 'HS256'));
-        return $decoded;
-    } catch (Exception $e) {
-        return false;
-    }
+// Gestion des requêtes OPTIONS (preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204); // No Content
+    exit;
 }
 
+$pdo = getPDO();
+
 return [
-    'GET'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET : Récupérer toutes les quittances ---
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Database connection failed']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
-        $stmt  = $pdo->query("SELECT * FROM quittances");
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($items);
-        exit;
+        try {
+            // Joindre avec la table 'employees' pour obtenir le nom de l'employé
+            $stmt = $pdo->query("SELECT q.*, e.name AS employee_name 
+                                FROM quittances q 
+                                LEFT JOIN employees e ON q.employee_id = e.id
+                                ORDER BY q.date_emission DESC");
+            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            Response::success('Quittances récupérées avec succès.', $items);
+        } catch (PDOException $e) {
+            error_log('Error fetching quittances: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des quittances.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'POST'   => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET_ID : Récupérer une quittance spécifique ---
+    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Database connection failed']);
-            exit;
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de quittance invalide ou manquant dans l\'URL.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
+        }
+
+        try {
+            // Joindre avec la table 'employees' pour obtenir le nom de l'employé
+            $stmt = $pdo->prepare("SELECT q.*, e.name AS employee_name 
+                                   FROM quittances q 
+                                   LEFT JOIN employees e ON q.employee_id = e.id
+                                   WHERE q.id = :id");
+            $stmt->execute([':id' => $id]);
+            $quittance = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$quittance) {
+                Response::notFound('Quittance non trouvée.');
+                return;
+            }
+            Response::success('Quittance récupérée avec succès.', $quittance);
+        } catch (PDOException $e) {
+            error_log('Error fetching single quittance: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération de la quittance.', 500, ['details' => $e->getMessage()]);
+        }
+    },
+
+    // --- Méthode POST : Créer une nouvelle quittance ---
+    'POST' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour créer une ressource.'
+            );
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['employee_id'], $data['date_paiement'], $data['montant'], $data['periode_service'], $data['numero_quittance'], $data['date_emission'], $data['type'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
+
+        // Champs obligatoires
+        $requiredFields = ['employee_id', 'date_paiement', 'montant', 'periode_service', 'numero_quittance', 'date_emission', 'type'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire.");
+                return;
+            }
         }
-        $employee_id = $data['employee_id'] ?? null;
-        $sql         = "INSERT INTO quittances (employee_id, date_paiement, montant, periode_service, numero_quittance, date_emission, type) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        $stmt        = $pdo->prepare($sql);
-        $stmt->execute([
-            $employee_id,
-            $data['date_paiement'],
-            $data['montant'],
-            $data['periode_service'],
-            $data['numero_quittance'],
-            $data['date_emission'],
-            $data['type'],
-        ]);
-        echo json_encode([
-            'success' => true,
-            'id'      => $pdo->lastInsertId(),
-            'message' => 'Quittance créée avec succès',
-        ]);
-        exit;
+
+        // Validation de l'ID employé
+        $employee_id = filter_var($data['employee_id'], FILTER_VALIDATE_INT);
+        if ($employee_id === false || $employee_id <= 0) {
+            Response::badRequest('ID employé invalide.');
+            return;
+        }
+
+        // Validation du montant
+        if (!is_numeric($data['montant']) || $data['montant'] <= 0) {
+            Response::badRequest("Le champ 'montant' doit être un nombre positif.");
+            return;
+        }
+
+        // Validation du format des dates (YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS)
+        $dateFields = ['date_paiement', 'date_emission'];
+        foreach ($dateFields as $field) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data[$field])) {
+                Response::badRequest("Le format de la date '{$field}' est invalide. Utilisez YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS.");
+                return;
+            }
+        }
+        
+        $periode_service = trim($data['periode_service']);
+        if (empty($periode_service)) {
+            Response::badRequest("Le champ 'periode_service' ne peut pas être vide.");
+            return;
+        }
+
+        try {
+            $montant          = (float) $data['montant'];
+            $date_paiement    = $data['date_paiement'];
+            $numero_quittance = trim($data['numero_quittance']);
+            $date_emission    = $data['date_emission'];
+            $type             = trim($data['type']);
+
+            $sql = "INSERT INTO quittances (employee_id, date_paiement, montant, periode_service, numero_quittance, date_emission, type) 
+                    VALUES (:employee_id, :date_paiement, :montant, :periode_service, :numero_quittance, :date_emission, :type)";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':employee_id'     => $employee_id,
+                ':date_paiement'   => $date_paiement,
+                ':montant'         => $montant,
+                ':periode_service' => $periode_service,
+                ':numero_quittance' => $numero_quittance,
+                ':date_emission'   => $date_emission,
+                ':type'            => $type,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            Response::created('Quittance créée avec succès.', ['id' => $pdo->lastInsertId()]);
+        } catch (PDOException $e) {
+            error_log('Error creating quittance: ' . $e->getMessage());
+            Response::error('Erreur lors de la création de la quittance.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'PUT'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode PUT_ID : Modifier une quittance spécifique ---
+    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour modifier une ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Database connection failed']);
-            exit;
+        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de quittance invalide ou manquant dans l\'URL.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['id'], $data['employee_id'], $data['date_paiement'], $data['periode_service'], $data['numero_quittance'], $data['date_emission'], $data['type'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
+
+        // Champs obligatoires pour la mise à jour
+        $requiredFields = ['employee_id', 'date_paiement', 'montant', 'periode_service', 'numero_quittance', 'date_emission', 'type'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
+                return;
+            }
         }
-        $employee_id = $data['employee_id'] ?? null;
-        $sql         = "UPDATE quittances SET date_paiement=?, periode_service=?, numero_quittance=?, date_emission=?, type=? WHERE id=?";
-        $stmt        = $pdo->prepare($sql);
-        $stmt->execute([
-            $employee_id,
-            $data['date_paiement'],
-            $data['periode_service'],
-            $data['numero_quittance'],
-            $data['date_emission'],
-            $data['type'],
-            $data['id'],
-        ]);
-        echo json_encode([
-            'success' => true,
-            'message' => 'Quittances mise à jour avec succès',
-        ]);
-        exit;
+
+        // Validation de l'ID employé
+        $employee_id = filter_var($data['employee_id'], FILTER_VALIDATE_INT);
+        if ($employee_id === false || $employee_id <= 0) {
+            Response::badRequest('ID employé invalide.');
+            return;
+        }
+
+        // Validation du montant
+        if (!is_numeric($data['montant']) || $data['montant'] <= 0) {
+            Response::badRequest("Le champ 'montant' doit être un nombre positif.");
+            return;
+        }
+
+        // Validation du format des dates
+        $dateFields = ['date_paiement', 'date_emission'];
+        foreach ($dateFields as $field) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data[$field])) {
+                Response::badRequest("Le format de la date '{$field}' est invalide. Utilisez YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS.");
+                return;
+            }
+        }
+        
+        // Validation de periode_service
+        $periode_service = trim($data['periode_service']);
+        if (empty($periode_service)) {
+            Response::badRequest("Le champ 'periode_service' ne peut pas être vide.");
+            return;
+        }
+
+        try {
+            $montant          = (float) $data['montant'];
+            $date_paiement    = $data['date_paiement'];
+            $numero_quittance = trim($data['numero_quittance']);
+            $date_emission    = $data['date_emission'];
+            $type             = trim($data['type']);
+
+            $sql = "UPDATE quittances SET 
+                        employee_id = :employee_id, 
+                        date_paiement = :date_paiement, 
+                        montant = :montant, 
+                        periode_service = :periode_service, 
+                        numero_quittance = :numero_quittance, 
+                        date_emission = :date_emission, 
+                        type = :type 
+                    WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':employee_id'     => $employee_id,
+                ':date_paiement'   => $date_paiement,
+                ':montant'         => $montant,
+                ':periode_service' => $periode_service,
+                ':numero_quittance' => $numero_quittance,
+                ':date_emission'   => $date_emission,
+                ':type'            => $type,
+                ':id'              => $id,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de mise à jour.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Quittance non trouvée avec l\'ID spécifié ou aucune modification effectuée.');
+                return;
+            }
+
+            Response::success('Quittance modifiée avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error updating quittance: ' . $e->getMessage());
+            Response::error('Erreur lors de la modification de la quittance.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'DELETE' => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode DELETE_ID : Supprimer une quittance spécifique ---
+    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour supprimer une ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Database connection failed']);
-            exit;
+        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de quittance invalide ou manquant dans l\'URL.');
+            return;
         }
 
-        $id = intval($_GET['id'] ?? 0);
-        if (! $id) {
-            echo json_encode(['error' => 'ID manquant']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
-        $stmt = $pdo->prepare("DELETE FROM quittances WHERE id = ?");
-        $stmt->execute([$id]);
-        echo json_encode([
-            'success' => true,
-            'message' => 'Quittance supprimée avec succès',
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-        exit;
+
+        try {
+            $sql = "DELETE FROM quittances WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([':id' => $id]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Quittance non trouvée avec l\'ID spécifié.');
+                return;
+            }
+
+            Response::success('Quittance supprimée avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error deleting quittance: ' . $e->getMessage());
+            Response::error('Erreur lors de la suppression de la quittance.', 500, ['details' => $e->getMessage()]);
+        }
     },
 ];
-
-// Fermeture de la connexion à la base de données
-$pdo = null;

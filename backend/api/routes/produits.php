@@ -1,159 +1,266 @@
 <?php
-require_once __DIR__ . '/../../config/db.php';
+// backend/api/routes/produits.php
 
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response et JWT
+
+use Core\Response;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-function isAuthenticated()
-{
-    $headers = getallheaders();
-    if (! isset($headers['Authorization'])) {
-        return false;
-    }
+// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-    $authHeader = $headers['Authorization'];
-    if (strpos($authHeader, 'Bearer ') !== 0) {
-        return false;
-    }
-
-    $jwt        = trim(str_replace('Bearer ', '', $authHeader));
-    $secret_key = env('JWT_SECRET_KEY');
-
-    try {
-        $decoded = JWT::decode($jwt, new Key($secret_key, 'HS256'));
-        return $decoded;
-    } catch (Exception $e) {
-        return false;
-    }
+// Gestion des requêtes OPTIONS (preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204); // No Content
+    exit;
 }
 
+$pdo = getPDO();
+
+
 return [
-    'GET'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET : Récupérer tous les produits ---
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
-        $stmt  = $pdo->query("SELECT * FROM produits");
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($items);
-        exit;
+        try {
+            $stmt  = $pdo->query("SELECT * FROM produits ORDER BY name ASC");
+            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            Response::success('Produits récupérés avec succès.', $items);
+        } catch (PDOException $e) {
+            error_log('Error fetching produits: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des produits.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'POST'   => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET_ID : Récupérer un produit spécifique --- 
+    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de produit invalide ou manquant dans l\'URL.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM produits WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $produit = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$produit) {
+                Response::notFound('Produit non trouvé.');
+                return;
+            }
+            Response::success('Produit récupéré avec succès.', $produit);
+        } catch (PDOException $e) {
+            error_log('Error fetching single produit: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération du produit.', 500, ['details' => $e->getMessage()]);
+        }
+    },
+
+    // --- Méthode POST : Créer un nouveau produit ---
+    'POST' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour créer une ressource.'
+            );
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['name'], $data['price'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
+
+        // Champs obligatoires
+        $requiredFields = ['name', 'price'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire.");
+                return;
+            }
         }
-        $description = $data['description'] ?? null;
-        $sql         = "INSERT INTO produits (name, description, price) VALUES (?, ?, ?)";
-        $stmt        = $pdo->prepare($sql);
-        $stmt->execute([
-            $data['name'],
-            $description,
-            $data['price'],
-        ]);
-        echo json_encode([
-            'success' => true,
-            'id'      => $pdo->lastInsertId(),
-        ]);
-        exit;
+
+        // Validation du prix
+        if (!is_numeric($data['price']) || $data['price'] < 0) {
+            Response::badRequest("Le prix doit être un nombre positif ou zéro.");
+            return;
+        }
+
+        try {
+            $name        = trim($data['name']);
+            $price       = (float) $data['price'];
+            $description = $data['description'] ?? null;
+
+            $sql  = "INSERT INTO produits (name, description, price) VALUES (:name, :description, :price)";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':name'        => $name,
+                ':description' => $description,
+                ':price'       => $price,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            Response::created('Produit ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+        } catch (PDOException $e) {
+            error_log('Error creating produit: ' . $e->getMessage());
+            Response::error('Erreur lors de la création du produit.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'PUT'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode PUT_ID : Modifier un produit spécifique ---
+    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour modifier une ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de produit invalide ou manquant dans l\'URL.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['id'], $data['name'], $data['price'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
+
+        // Champs obligatoires pour la mise à jour
+        $requiredFields = ['name', 'price']; // ID n'est plus obligatoire dans $data
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
+                return;
+            }
         }
-        $description = $data['description'] ?? null;
-        $sql         = "UPDATE produits SET name=?, description=?, price=? WHERE id=?";
-        $stmt        = $pdo->prepare($sql);
-        $stmt->execute([
-            $data['name'],
-            $description,
-            $data['price'],
-            $data['id'],
-        ]);
-        echo json_encode(['success' => true]);
-        exit;
+
+        // Validation du prix
+        if (!is_numeric($data['price']) || $data['price'] < 0) {
+            Response::badRequest("Le prix doit être un nombre positif ou zéro.");
+            return;
+        }
+
+        try {
+            $name        = trim($data['name']);
+            $price       = (float) $data['price'];
+            $description = $data['description'] ?? null;
+
+            $sql  = "UPDATE produits SET name = :name, description = :description, price = :price WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':name'        => $name,
+                ':description' => $description,
+                ':price'       => $price,
+                ':id'          => $id,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de mise à jour.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Produit non trouvé avec l\'ID spécifié ou aucune modification effectuée.');
+                return;
+            }
+
+            Response::success('Produit modifié avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error updating produit: ' . $e->getMessage());
+            Response::error('Erreur lors de la modification du produit.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'DELETE' => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode DELETE_ID : Supprimer un produit spécifique ---
+    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour supprimer une ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de produit invalide ou manquant dans l\'URL.');
+            return;
         }
 
-        $id = intval($_GET['id'] ?? 0);
-        if (! $id) {
-            echo json_encode(['error' => 'ID manquant']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
-        $stmt = $pdo->prepare("DELETE FROM produits WHERE id = ?");
-        $stmt->execute([$id]);
-        echo json_encode([
-            'success' => true,
-            'message' => 'Produit supprimé avec succès',
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-        exit;
+
+        try {
+            $sql  = "DELETE FROM produits WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([':id' => $id]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Produit non trouvé avec l\'ID spécifié.');
+                return;
+            }
+
+            Response::success('Produit supprimé avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error deleting produit: ' . $e->getMessage());
+            Response::error('Erreur lors de la suppression du produit.', 500, ['details' => $e->getMessage()]);
+        }
     },
 ];
-
-// Ferme la connexion à la base de données
-$pdo = null;

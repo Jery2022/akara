@@ -3,6 +3,22 @@ import ChartSection from './ChartSection';
 
 // Dashboard Component
 function DashboardTab({ stock, payments }) {
+  // Utilisez Array.isArray pour une vérification plus robuste
+  const isStockArray = Array.isArray(stock);
+  const isPaymentsArray = Array.isArray(payments);
+  
+  // Afficher un message de chargement si les données ne sont pas encore prêtes
+  if (!isStockArray || !isPaymentsArray) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p className="text-gray-500 dark:text-gray-400">
+          Chargement du tableau de bord...
+        </p>
+      </div>
+    );
+  }
+
+  // Utiliser les tableaux vérifiés pour les calculs
   const lowStock = stock.filter((item) => item.quantity <= item.min);
   const totalRevenue = payments
     .filter((p) => p.type === 'income')

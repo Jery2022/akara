@@ -1,170 +1,363 @@
 <?php
+// backend/api/routes/entreeStock.php
+
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+use Core\Response;
 
-function isAuthenticated()
-{
-    $headers = getallheaders();
-    if (! isset($headers['Authorization'])) {
-        return false;
-    }
 
-    $authHeader = $headers['Authorization'];
-    if (strpos($authHeader, 'Bearer ') !== 0) {
-        return false;
-    }
-
-    $jwt        = trim(str_replace('Bearer ', '', $authHeader));
-    $secret_key = env('JWT_SECRET_KEY');
-
-    try {
-        $decoded = JWT::decode($jwt, new Key($secret_key, 'HS256'));
-        return $decoded;
-    } catch (Exception $e) {
-        return false;
-    }
-}
+// Obtenez l'instance PDO une seule fois au début
+$pdo = getPDO();
 
 return [
-    'GET'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET : Récupérer toutes les entrées de stock ---
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
-        $stmt  = $pdo->query("SELECT * FROM entreeStock");
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($items);
-        exit;
+        try {
+            $stmt = $pdo->query("SELECT es.*, 
+                                        p.nom AS produit_nom, 
+                                        u.name AS user_name, 
+                                        s.nom AS supplier_nom, 
+                                        e.nom AS entrepot_nom
+                                FROM entreeStock es
+                                LEFT JOIN produits p ON es.produit_id = p.id
+                                LEFT JOIN users u ON es.user_id = u.id
+                                LEFT JOIN suppliers s ON es.suppliers_id = s.id
+                                LEFT JOIN entrepots e ON es.entrepot_id = e.id
+                                ORDER BY es.ref_date DESC");
+            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            Response::success('Entrées de stock récupérées avec succès.', $items);
+        } catch (PDOException $e) {
+            error_log('Error fetching entreeStock: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des entrées de stock.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'POST'   => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode GET_ID : Récupérer une entrée de stock spécifique ---
+    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID d\'entrée de stock invalide ou manquant dans l\'URL.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT es.*, 
+                                        p.nom AS produit_nom, 
+                                        u.name AS user_name, 
+                                        s.nom AS supplier_nom, 
+                                        e.nom AS entrepot_nom
+                                FROM entreeStock es
+                                LEFT JOIN produits p ON es.produit_id = p.id
+                                LEFT JOIN users u ON es.user_id = u.id
+                                LEFT JOIN suppliers s ON es.suppliers_id = s.id
+                                LEFT JOIN entrepots e ON es.entrepot_id = e.id
+                                WHERE es.id = :id");
+            $stmt->execute([':id' => $id]);
+            $entreeStock = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$entreeStock) {
+                Response::notFound('Entrée de stock non trouvée.');
+                return;
+            }
+            Response::success('Entrée de stock récupérée avec succès.', $entreeStock);
+        } catch (PDOException $e) {
+            error_log('Error fetching single entreeStock: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération de l\'entrée de stock.', 500, ['details' => $e->getMessage()]);
+        }
+    },
+
+    // --- Méthode POST : Créer une nouvelle entrée de stock ---
+    'POST' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour créer une ressource.'
+            );
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['produit_id'], $data['quantity'], $data['ref_date'], $data['entrepot_id'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
+
+        // Champs obligatoires
+        $requiredFields = ['produit_id', 'quantity', 'ref_date', 'entrepot_id'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire.");
+                return;
+            }
         }
-        $user_id      = $data['user_id'] ?? null;
-        $suppliers_id = $data['suppliers_id'] ?? null;
-        $motif        = $data['motif'] ?? null;
-        $stmt         = $pdo->prepare("INSERT INTO entreeStock (produit_id, quantity, ref_date, user_id, suppliers_id, entrepot_id, motif) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $data['produit_id'],
-            $data['quantity'],
-            $data['ref_date'],
-            $user_id,
-            $suppliers_id,
-            $data['entrepot_id'],
-            $motif,
-        ]);
-        echo json_encode([
-            'success' => true,
-            'id'      => $pdo->lastInsertId(),
-        ]);
-        exit;
+
+        // Validation des IDs (doivent être des entiers positifs)
+        $idFields = ['produit_id', 'entrepot_id'];
+        foreach ($idFields as $field) {
+            $data[$field] = filter_var($data[$field], FILTER_VALIDATE_INT);
+            if ($data[$field] === false || $data[$field] <= 0) {
+                Response::badRequest("Le champ '{$field}' doit être un ID valide (entier positif).");
+                return;
+            }
+        }
+
+        // Validation de quantity
+        $quantity = filter_var($data['quantity'], FILTER_VALIDATE_INT);
+        if ($quantity === false || $quantity <= 0) { // La quantité doit être un entier positif
+            Response::badRequest("Le champ 'quantity' doit être un entier positif.");
+            return;
+        }
+
+        // Validation de user_id et suppliers_id (s'ils sont présents, ils doivent être des entiers positifs)
+        $user_id = null;
+        if (isset($data['user_id']) && $data['user_id'] !== '') {
+            $user_id = filter_var($data['user_id'], FILTER_VALIDATE_INT);
+            if ($user_id === false || $user_id <= 0) {
+                Response::badRequest("Le champ 'user_id' doit être un ID valide (entier positif) s'il est fourni.");
+                return;
+            }
+        }
+
+        $suppliers_id = null;
+        if (isset($data['suppliers_id']) && $data['suppliers_id'] !== '') {
+            $suppliers_id = filter_var($data['suppliers_id'], FILTER_VALIDATE_INT);
+            if ($suppliers_id === false || $suppliers_id <= 0) {
+                Response::badRequest("Le champ 'suppliers_id' doit être un ID valide (entier positif) s'il est fourni.");
+                return;
+            }
+        }
+
+        // Validation du format de la date (YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS)
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data['ref_date'])) {
+            Response::badRequest("Le format de la date de référence est invalide. Utilisez YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS.");
+            return;
+        }
+
+        try {
+            $produit_id  = $data['produit_id'];
+            $entrepot_id = $data['entrepot_id'];
+            $ref_date    = $data['ref_date'];
+            $motif       = trim($data['motif'] ?? '');
+
+            $sql = "INSERT INTO entreeStock (produit_id, quantity, ref_date, user_id, suppliers_id, entrepot_id, motif) 
+                    VALUES (:produit_id, :quantity, :ref_date, :user_id, :suppliers_id, :entrepot_id, :motif)";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':produit_id'  => $produit_id,
+                ':quantity'    => $quantity,
+                ':ref_date'    => $ref_date,
+                ':user_id'     => $user_id,
+                ':suppliers_id' => $suppliers_id,
+                ':entrepot_id' => $entrepot_id,
+                ':motif'       => $motif,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            Response::created('Entrée de stock ajoutée avec succès.', ['id' => $pdo->lastInsertId()]);
+        } catch (PDOException $e) {
+            error_log('Error creating entreeStock: ' . $e->getMessage());
+            Response::error('Erreur lors de la création de l\'entrée de stock.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'PUT'    => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode PUT_ID : Modifier une entrée de stock spécifique ---
+    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour modifier une ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID d\'entrée de stock invalide ou manquant dans l\'URL.');
+            return;
+        }
+
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (! isset($data['id'], $data['produit_id'], $data['quantity'], $data['ref_date'], $data['entrepot_id'])) {
-            echo json_encode(['error' => 'Champs obligatoires manquants']);
-            exit;
+
+        // Champs obligatoires pour la mise à jour
+        $requiredFields = ['produit_id', 'quantity', 'ref_date', 'entrepot_id'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
+                return;
+            }
         }
-        $user_id      = $data['user_id'] ?? null;
-        $suppliers_id = $data['suppliers_id'] ?? null;
-        $motif        = $data['motif'] ?? null;
-        $stmt         = $pdo->prepare("UPDATE entreeStock SET produit_id=?, quantity=?, ref_date=?, user_id=?, suppliers_id=?, entrepot_id=?, motif=? WHERE id=?");
-        $stmt->execute([
-            $data['produit_id'],
-            $data['quantity'],
-            $data['ref_date'],
-            $user_id,
-            $suppliers_id,
-            $data['entrepot_id'],
-            $motif,
-            $data['id'],
-        ]);
-        echo json_encode([
-            'success' => true,
-        ]);
-        exit;
+
+        // Validation des IDs (doivent être des entiers positifs)
+        $idFields = ['produit_id', 'entrepot_id'];
+        foreach ($idFields as $field) {
+            $data[$field] = filter_var($data[$field], FILTER_VALIDATE_INT);
+            if ($data[$field] === false || $data[$field] <= 0) {
+                Response::badRequest("Le champ '{$field}' doit être un ID valide (entier positif).");
+                return;
+            }
+        }
+
+        // Validation de quantity
+        $quantity = filter_var($data['quantity'], FILTER_VALIDATE_INT);
+        if ($quantity === false || $quantity <= 0) {
+            Response::badRequest("Le champ 'quantity' doit être un entier positif.");
+            return;
+        }
+
+        // Validation de user_id et suppliers_id (s'ils sont présents, ils doivent être des entiers positifs)
+        $user_id = null;
+        if (isset($data['user_id']) && $data['user_id'] !== '') {
+            $user_id = filter_var($data['user_id'], FILTER_VALIDATE_INT);
+            if ($user_id === false || $user_id <= 0) {
+                Response::badRequest("Le champ 'user_id' doit être un ID valide (entier positif) s'il est fourni.");
+                return;
+            }
+        }
+
+        $suppliers_id = null;
+        if (isset($data['suppliers_id']) && $data['suppliers_id'] !== '') {
+            $suppliers_id = filter_var($data['suppliers_id'], FILTER_VALIDATE_INT);
+            if ($suppliers_id === false || $suppliers_id <= 0) {
+                Response::badRequest("Le champ 'suppliers_id' doit être un ID valide (entier positif) s'il est fourni.");
+                return;
+            }
+        }
+
+        // Validation du format de la date
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data['ref_date'])) {
+            Response::badRequest("Le format de la date de référence est invalide. Utilisez YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS.");
+            return;
+        }
+
+        try {
+            $produit_id  = $data['produit_id'];
+            $entrepot_id = $data['entrepot_id'];
+            $ref_date    = $data['ref_date'];
+            $motif       = trim($data['motif'] ?? '');
+
+            $sql = "UPDATE entreeStock SET 
+                        produit_id = :produit_id, 
+                        quantity = :quantity, 
+                        ref_date = :ref_date, 
+                        user_id = :user_id, 
+                        suppliers_id = :suppliers_id, 
+                        entrepot_id = :entrepot_id, 
+                        motif = :motif 
+                    WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([
+                ':produit_id'  => $produit_id,
+                ':quantity'    => $quantity,
+                ':ref_date'    => $ref_date,
+                ':user_id'     => $user_id,
+                ':suppliers_id' => $suppliers_id,
+                ':entrepot_id' => $entrepot_id,
+                ':motif'       => $motif,
+                ':id'          => $id,
+            ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de mise à jour.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Entrée de stock non trouvée avec l\'ID spécifié ou aucune modification effectuée.');
+                return;
+            }
+
+            Response::success('Entrée de stock modifiée avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error updating entreeStock: ' . $e->getMessage());
+            Response::error('Erreur lors de la modification de l\'entrée de stock.', 500, ['details' => $e->getMessage()]);
+        }
     },
 
-    'DELETE' => function () {
-
-        if (! isAuthenticated()) {
-            http_response_code(401);
-            echo json_encode([
-                'error'   => 'Accès non autorisé',
-                'message' => 'Vous devez vous authentifier pour accéder à cette ressource.',
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            exit;
+    // --- Méthode DELETE_ID : Supprimer une entrée de stock spécifique ---
+    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour supprimer une ressource.'
+            );
+            return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
-            echo json_encode(['error' => 'Échec de la connexion à la base de données']);
-            exit;
+        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID d\'entrée de stock invalide ou manquant dans l\'URL.');
+            return;
         }
 
-        $id = intval($_GET['id'] ?? 0);
-        if (! $id) {
-            echo json_encode(['error' => 'ID manquant']);
-            exit;
+        if (!$pdo) {
+            Response::error('Échec de la connexion à la base de données.', 500);
+            return;
         }
-        $stmt = $pdo->prepare("DELETE FROM entreeStock WHERE id = ?");
-        $stmt->execute([$id]);
-        echo json_encode([
-            'success' => true,
-            'message' => 'Entrée de stock supprimée avec succès',
-        ]);
-        exit;
-    },
+
+        try {
+            $sql = "DELETE FROM entreeStock WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
+            
+            $executed = $stmt->execute([':id' => $id]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            if ($stmt->rowCount() === 0) {
+                Response::notFound('Entrée de stock non trouvée avec l\'ID spécifié.');
+                return;
+            }
+
+            Response::success('Entrée de stock supprimée avec succès.', ['id' => (int) $id]);
+        } catch (PDOException $e) {
+            error_log('Error deleting entreeStock: ' . $e->getMessage());
+            Response::error('Erreur lors de la suppression de l\'entrée de stock.', 500, ['details' => $e->getMessage()]);
+        }
+    }, 
 ];
-// Ferme la connexion à la base de données
-$pdo = null;

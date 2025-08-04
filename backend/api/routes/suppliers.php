@@ -1,142 +1,189 @@
+
 <?php
 // backend/api/routes/suppliers.php
 
-// Inclut la connexion à la base de données.
-// __DIR__ ici est backend/api/routes/. Pour atteindre backend/config/, il faut remonter deux fois (../../).
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response, et JWT si utilisé globalement
 
-// Utilisez le namespace de la classe Response.
 use Core\Response;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;  
 
-// Les fonctions isAuthenticated() et handleApiRequest() sont maintenant gérées par backend/api/index.php.
-// Vous n'avez pas besoin de les redéfinir ici.
+// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: http://localhost:3000");
+header("Access-Control-Allow-Credentials: true");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"); // Ajout de OPTIONS
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-// Ce fichier retourne un tableau de fonctions anonymes (closures),
-// chaque fonction étant le handler pour une méthode HTTP spécifique.
+// Gestion des requêtes OPTIONS (preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204); // No Content
+    exit;
+}
+
+$pdo = getPDO();
+
 return [
-    // --- GESTION DES REQUÊTES GET (Récupérer tous les fournisseurs) ---
-    // Cette fonction sera appelée si la requête est GET et qu'aucun ID n'est fourni dans l'URL (ex: /suppliers).
-    'GET'       => function (array $params, ?object $currentUser) {
-        // L'authentification a déjà été gérée par index.php via handleApiRequest().
-        // Si $currentUser est null, c'est que l'authentification a échoué et une 401 a été envoyée.
-        // On n'a pas besoin de refaire isAuthenticated() ici.
+    // --- Méthode GET : Récupérer tous les fournisseurs ---
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
+            return;
+        }
 
-        $pdo = getPDO();
-        if (! $pdo) {
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
         try {
-            $stmt  = $pdo->query("SELECT * FROM suppliers");
+            $stmt  = $pdo->query("SELECT * FROM suppliers ORDER BY name ASC");
             $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::json($items);
+            Response::success('Fournisseurs récupérés avec succès.', $items); // Utilisation de success()
         } catch (\PDOException $e) {
             error_log("Erreur DB GET suppliers: " . $e->getMessage());
-            Response::error('Erreur interne du serveur lors de la récupération des fournisseurs.', 500);
+            Response::error('Erreur interne du serveur lors de la récupération des fournisseurs.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- GESTION DES REQUÊTES GET_ID (Récupérer un fournisseur par ID) ---
-    // Ce handler est appelé si la requête est GET et qu'un ID est fourni (ex: /suppliers/123).
-    // Notez le suffixe '_ID' qui correspond à la logique de routage dans index.php.
-    'GET_ID'    => function (array $params, ?object $currentUser) {
-        $id = $params['id'] ?? null;
-
-        if (! $id) {
-            Response::badRequest('ID de fournisseur manquant.');
+    // --- Méthode GET_ID : Récupérer un fournisseur spécifique ---
+    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour accéder à cette ressource.'
+            );
             return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) { // Validation numérique de l'ID
+            Response::badRequest('ID de fournisseur invalide ou manquant.');
+            return;
+        }
+
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
         try {
-            $stmt = $pdo->prepare("SELECT * FROM suppliers WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $pdo->prepare("SELECT * FROM suppliers WHERE id = :id"); // Paramètre nommé
+            $stmt->execute([':id' => $id]);
             $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (! $item) {
+            if (!$item) {
                 Response::notFound('Fournisseur non trouvé.');
                 return;
             }
-            Response::json($item);
+            Response::success('Fournisseur récupéré avec succès.', $item); // Utilisation de success()
         } catch (\PDOException $e) {
             error_log("Erreur DB GET_ID suppliers: " . $e->getMessage());
-            Response::error('Erreur interne du serveur lors de la récupération du fournisseur.', 500);
+            Response::error('Erreur interne du serveur lors de la récupération du fournisseur.', 500, ['details' => $e->getMessage()]);
         }
     },
 
     // --- GESTION DES REQUÊTES POST (Ajouter un nouveau fournisseur) ---
-    'POST'      => function (array $params, ?object $currentUser) {
-        $pdo = getPDO();
-        if (! $pdo) {
+    'POST' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour créer une ressource.'
+            );
+            return;
+        }
+
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (! isset($data['name'], $data['refContact'], $data['phone'], $data['email'])) {
-            Response::badRequest('Champs obligatoires manquants: name, refContact, phone, email.');
-            return;
+        // Champs obligatoires
+        $requiredFields = ['name', 'refContact', 'phone', 'email'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire.");
+                return;
+            }
         }
 
         $name       = trim($data['name']);
         $refContact = trim($data['refContact']);
         $phone      = trim($data['phone']);
         $email      = filter_var($data['email'], FILTER_VALIDATE_EMAIL);
-        $contrat_id = filter_var($data['contrat_id'] ?? null, FILTER_VALIDATE_INT);
+        $contrat_id = null; // Initialiser à null par défaut
 
-        if (! $email) {
+        if (!$email) {
             Response::badRequest('Format d\'e-mail invalide.');
+            return;
+        }
+        // Validation du téléphone: une regex simple pour des chiffres, espaces, tirets, parenthèses, plus
+        if (!preg_match('/^[0-9\s\-\(\)\+]+$/', $phone)) {
+            Response::badRequest('Numéro de téléphone invalide.');
             return;
         }
 
         try {
-            $sql  = "INSERT INTO suppliers (name, refContact, phone, email, contrat_id) VALUES (?, ?, ?, ?, ?)";
+            $sql  = "INSERT INTO suppliers (name, refContact, phone, email, contrat_id) 
+                     VALUES (:name, :refContact, :phone, :email, :contrat_id)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                $name,
-                $refContact,
-                $phone,
-                $email,
-                $contrat_id,
+            
+            $executed = $stmt->execute([
+                ':name'       => $name,
+                ':refContact' => $refContact,
+                ':phone'      => $phone,
+                ':email'      => $email,
+                ':contrat_id' => $contrat_id,
             ]);
-            Response::json([
-                'message' => 'Fournisseur ajouté avec succès.',
-                'id'      => $pdo->lastInsertId(),
-            ], 201); // 201 Created
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
+
+            Response::created('Fournisseur ajouté avec succès.', ['id' => $pdo->lastInsertId()]); // 201 Created
         } catch (\PDOException $e) {
             error_log("Erreur DB POST suppliers: " . $e->getMessage());
-            Response::error('Erreur interne du serveur lors de l\'ajout du fournisseur.', 500);
+            Response::error('Erreur interne du serveur lors de l\'ajout du fournisseur.', 500, ['details' => $e->getMessage()]);
         }
     },
 
     // --- GESTION DES REQUÊTES PUT_ID (Mettre à jour un fournisseur existant) ---
-    // Notez le suffixe '_ID' car une mise à jour nécessite un ID dans l'URL.
-    'PUT_ID'    => function (array $params, ?object $currentUser) {
-        $id = $params['id'] ?? null;
-
-        if (! $id) {
-            Response::badRequest('ID de fournisseur manquant pour la mise à jour.');
+    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour modifier une ressource.'
+            );
             return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) { // Validation numérique de l'ID
+            Response::badRequest('ID de fournisseur invalide ou manquant pour la mise à jour.');
+            return;
+        }
+
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (! isset($data['name'], $data['refContact'], $data['phone'], $data['email'])) {
-            Response::badRequest('Champs obligatoires manquants: name, refContact, phone, email.');
-            return;
+        // Champs obligatoires pour la mise à jour
+        $requiredFields = ['name', 'refContact', 'phone', 'email'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
+                return;
+            }
         }
 
         $name       = trim($data['name']);
@@ -145,65 +192,93 @@ return [
         $email      = filter_var($data['email'], FILTER_VALIDATE_EMAIL);
         $contrat_id = filter_var($data['contrat_id'] ?? null, FILTER_VALIDATE_INT);
 
-        if (! $email) {
+        if (!$email) {
             Response::badRequest('Format d\'e-mail invalide.');
+            return;
+        }
+        // Validation du téléphone
+        if (!preg_match('/^[0-9\s\-\(\)\+]+$/', $phone)) {
+            Response::badRequest('Numéro de téléphone invalide.');
             return;
         }
 
         try {
-            $sql  = "UPDATE suppliers SET name=?, refContact=?, phone=?, email=?, contrat_id=? WHERE id=?";
+            $sql  = "UPDATE suppliers SET 
+                        name = :name, 
+                        refContact = :refContact, 
+                        phone = :phone, 
+                        email = :email, 
+                        contrat_id = :contrat_id 
+                    WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                $name,
-                $refContact,
-                $phone,
-                $email,
-                $contrat_id,
-                $id,
+            
+            $executed = $stmt->execute([
+                ':name'       => $name,
+                ':refContact' => $refContact,
+                ':phone'      => $phone,
+                ':email'      => $email,
+                ':contrat_id' => $contrat_id,
+                ':id'         => $id,
             ]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de mise à jour.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
 
             if ($stmt->rowCount() === 0) {
                 Response::notFound('Aucun fournisseur trouvé avec cet ID ou aucune modification effectuée.');
                 return;
             }
 
-            Response::json(['message' => 'Fournisseur mis à jour avec succès.']);
+            Response::success('Fournisseur mis à jour avec succès.', ['id' => (int) $id]); // Utilisation de success() et ajout de l'ID
         } catch (\PDOException $e) {
             error_log("Erreur DB PUT suppliers: " . $e->getMessage());
-            Response::error('Erreur interne du serveur lors de la mise à jour du fournisseur.', 500);
+            Response::error('Erreur interne du serveur lors de la mise à jour du fournisseur.', 500, ['details' => $e->getMessage()]);
         }
     },
 
     // --- GESTION DES REQUÊTES DELETE_ID (Supprimer un fournisseur) ---
-    // Notez le suffixe '_ID' car une suppression nécessite un ID dans l'URL.
-    'DELETE_ID' => function (array $params, ?object $currentUser) {
-        $id = $params['id'] ?? null;
-
-        if (! $id) {
-            Response::badRequest('ID de fournisseur manquant ou invalide pour la suppression.');
+    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized(
+                'Accès non autorisé',
+                'Vous devez vous authentifier pour supprimer une ressource.'
+            );
             return;
         }
 
-        $pdo = getPDO();
-        if (! $pdo) {
+        $id = $params['id'] ?? null;
+        if (!is_numeric($id) || $id <= 0) { // Validation numérique de l'ID
+            Response::badRequest('ID de fournisseur invalide ou manquant pour la suppression.');
+            return;
+        }
+
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
         try {
-            $sql  = "DELETE FROM suppliers WHERE id =?";
+            $sql  = "DELETE FROM suppliers WHERE id = :id"; // Paramètre nommé
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$id]);
+            
+            $executed = $stmt->execute([':id' => $id]);
+
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+                return;
+            }
 
             if ($stmt->rowCount() === 0) {
                 Response::notFound('Aucun fournisseur trouvé avec cet ID pour la suppression.');
                 return;
             }
 
-            Response::json(['message' => 'Fournisseur supprimé avec succès.'], 200);
+            Response::success('Fournisseur supprimé avec succès.', ['id' => (int) $id]); // Utilisation de success()
         } catch (\PDOException $e) {
             error_log("Erreur DB DELETE suppliers: " . $e->getMessage());
-            Response::error('Erreur interne du serveur lors de la suppression du fournisseur.', 500);
+            Response::error('Erreur interne du serveur lors de la suppression du fournisseur.', 500, ['details' => $e->getMessage()]);
         }
     },
 ];

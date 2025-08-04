@@ -1,6 +1,5 @@
 import React from 'react';
-//import { v4 as uuidv4 } from 'uuid';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DashboardTab from './components/DashboardTab';
 import StockManagementTab from './components/StockManagementTab';
 import EmployeesTab from './components/EmployeesTab';
@@ -27,6 +26,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [loadingData, setLoadingData] = useState(true); // Nouvel état pour le chargement des données
   const { addToast } = useToast();
 
   // URL de l'API backend
@@ -52,10 +52,11 @@ export default function App() {
       const token = localStorage.getItem('authToken');
 
       if (!token) {
-        // Si pas de token, pas besoin d'appeler le backend, l'utilisateur n'est pas authentifié
+        // Si pas de token, l'utilisateur n'est pas authentifié
         setUser(null);
         setLoading(false); // Désactivez le loading
-        return; // Sortir de la fonction
+        // Ne pas toucher à loadingData ici, il sera géré dans le prochain useEffect
+        return;
       }
 
       try {
@@ -71,18 +72,15 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user || null);
-          addToast('Session restaurée!', 'info'); // Indique que la session a été récupérée
+          addToast('Session restaurée!', 'info');
         } else {
-          // Si le backend renvoie 401 ou autre erreur (token invalide/expiré)
           console.log(
             'Token invalide ou session expirée, veuillez vous reconnecter.'
           );
           addToast(
             'Votre session a expiré. Veuillez vous reconnecter.',
             'warning'
-          ); // Informez l'utilisateur
-
-          // Si le token est invalide ou expiré, supprimons-le du localStorage
+          );
           localStorage.removeItem('authToken');
           setUser(null);
         }
@@ -94,7 +92,7 @@ export default function App() {
             "Erreur lors de la vérification de l'authentification :",
             err
           );
-          localStorage.removeItem('authToken'); // Nettoyage en cas d'erreur réseau
+          localStorage.removeItem('authToken');
           setUser(null);
           addToast(
             'Erreur de connexion au serveur. Veuillez réessayer.',
@@ -102,14 +100,14 @@ export default function App() {
           );
         }
       } finally {
-        setLoading(false); // Toujours désactiver le loading à la fin
+        setLoading(false);
       }
     }
     checkAuth();
     return () => {
-      controller.abort(); // Annule la requête si le composant est démonté
+      controller.abort();
     };
-  }, [addToast]);
+  }, [addToast, API_URL]);
 
   // Données locales avant connexion au backend
   const [stockItems, setStockItems] = useState([]);
@@ -137,87 +135,117 @@ export default function App() {
   }, [darkMode]);
 
   // Chargement initial optimisé (parallélisé)
-
-  useEffect(() => {
-    async function fetchAll() {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        // Gérer le cas où l'utilisateur n'est pas connecté
-        return;
-      }
-
-      try {
-        const routes = [
-          'stock',
-          'employees',
-          'suppliers',
-          'customers',
-          'produits',
-          'contrats',
-          'entrepots',
-          'recettes',
-          'depenses',
-          'achats',
-          'ventes',
-          'factures',
-          'quittances',
-          'payments',
-        ];
-        const [
-          stock,
-          employees,
-          suppliers,
-          customers,
-          payments,
-          produits,
-          contrats,
-          entrepots,
-          recettes,
-          depenses,
-          achats,
-          ventes,
-          factures,
-          quittances,
-        ] = await Promise.all(
-          routes.map(async (route) => {
-            const res = await fetch(`${API_URL}/${route}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-            });
-            if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
-            return await res.json();
-          })
-        );
-        setStockItems(stock);
-        setEmployees(employees);
-        setSuppliers(suppliers);
-        setCustomers(customers);
-        setPayments(payments);
-        setProduits(produits);
-        setContrats(contrats);
-        setEntrepots(entrepots);
-        setRecettes(recettes);
-        setDepenses(depenses);
-        setAchats(achats);
-        setVentes(ventes);
-        setFactures(factures);
-        setQuittances(quittances);
-      } catch (err) {
-        console.error('Erreur lors du chargement des données :', err);
-        addToast(
-          'Erreur lors du chargement des données : ' + err.message,
-          'danger'
-        );
-      }
+  const fetchAll = useCallback(async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      // Cas de déconnexion géré par le useEffect suivant
+      return;
     }
-    if (user) fetchAll();
-  }, [user, API_URL, addToast]);
+    
+    setLoadingData(true);
+
+    try {
+      const routes = [
+        'stock',
+        'employees',
+        'suppliers',
+        'customers',
+        'produits',
+        'contrats',
+        'entrepots',
+        'recettes',
+        'depenses',
+        'achats',
+        'ventes',
+        'factures',
+        'quittances',
+        'payments',
+      ];
+
+      const responses = await Promise.all(
+        routes.map(async (route) => {
+          const res = await fetch(`${API_URL}/${route}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
+          return await res.json();
+        })
+      );
+
+      const [
+        stock,
+        employees,
+        suppliers,
+        customers,
+        produits,
+        contrats,
+        entrepots,
+        recettes,
+        depenses,
+        achats,
+        ventes,
+        factures,
+        quittances,
+        payments
+      ] = responses;
+
+      setStockItems(stock);
+      setEmployees(employees);
+      setSuppliers(suppliers);
+      setCustomers(customers);
+      setPayments(payments);
+      setProduits(produits);
+      setContrats(contrats);
+      setEntrepots(entrepots);
+      setRecettes(recettes);
+      setDepenses(depenses);
+      setAchats(achats);
+      setVentes(ventes);
+      setFactures(factures);
+      setQuittances(quittances);
+    } catch (err) {
+      console.error('Erreur lors du chargement des données :', err);
+      addToast(
+        'Erreur lors du chargement des données : ' + err.message,
+        'danger'
+      );
+    } finally {
+      setLoadingData(false);
+    }
+  }, [API_URL, addToast]);
+
+  // Déclenchement du chargement initial optimisé lorsque l'utilisateur est authentifié
+  useEffect(() => {
+    if (user) {
+      // Si l'utilisateur est connecté, on charge les données
+      setLoadingData(true);
+      fetchAll();
+    } else {
+      // Si l'utilisateur est déconnecté (au démarrage ou après logout), on réinitialise tout
+      setStockItems([]);
+      setEmployees([]);
+      setSuppliers([]);
+      setCustomers([]);
+      setPayments([]);
+      setProduits([]);
+      setContrats([]);
+      setEntrepots([]);
+      setRecettes([]);
+      setDepenses([]);
+      setAchats([]);
+      setVentes([]);
+      setFactures([]);
+      setQuittances([]);
+      // On s'assure que le chargement est désactivé si l'utilisateur n'est pas connecté
+      setLoadingData(false);
+    }
+  }, [user, fetchAll]);
 
   // Authentification serveur
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -256,13 +284,6 @@ export default function App() {
 
   // Déconnexion
   const handleLogout = async () => {
-    // try {
-    //   await fetch(`${API_URL}/index.php?route=logout`, {
-    //     method: 'POST',
-    //   });
-    // } catch (err) {
-    //   // ignore erreur logout
-    // }
     localStorage.removeItem('authToken');
     setUser(null);
   };
@@ -275,7 +296,7 @@ export default function App() {
           className="bg-white dark:bg-gray-800 p-6 rounded shadow space-y-4 w-full max-w-md"
         >
           <h1 className="text-xl font-bold text-emerald-700">
-            Les Compagnons du BTP
+            AKARA
           </h1>
           <input
             name="email"
@@ -307,12 +328,12 @@ export default function App() {
   }
 
   return (
-    <ToastProvider>
+    <ToastProvider >
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 text-gray-800 dark:text-gray-100 transition-colors duration-300">
         {/* Header */}
         <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
           <h1 className="text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400">
-            Les Compagnons du BTP
+            AKARA
           </h1>
           <div className="flex gap-2">
             <button
@@ -366,106 +387,127 @@ export default function App() {
 
           {/* Main Content */}
           <main className="flex-1 p-4 md:p-6 overflow-auto">
-            {activeTab === 'dashboard' && (
-              <DashboardTab stock={stockItems} payments={payments} />
-            )}
-            {activeTab === 'stock' && (
-              <StockManagementTab
-                items={stockItems}
-                setItems={setStockItems}
-                api={`${API_URL}/stock`}
-              />
-            )}
-            {activeTab === 'employees' && (
-              <EmployeesTab
-                employees={employees}
-                setEmployees={setEmployees}
-                api={`${API_URL}/employees`}
-              />
-            )}
-            {activeTab === 'suppliers' && (
-              <SuppliersTab
-                suppliers={suppliers}
-                setSuppliers={setSuppliers}
-                api={`${API_URL}/suppliers`}
-              />
-            )}
-            {activeTab === 'customers' && (
-              <CustomersTab
-                customers={customers}
-                setCustomers={setCustomers}
-                api={`${API_URL}/customers`}
-              />
-            )}
-            {activeTab === 'payments' && (
-              <PaymentsTab
-                payments={payments}
-                setPayments={setPayments}
-                api={`${API_URL}/payments`}
-              />
-            )}
-            {activeTab === 'produits' && (
-              <ProduitsTab
-                products={produits}
-                setProduits={setProduits}
-                api={`${API_URL}/produits`}
-              />
-            )}
-            {activeTab === 'contrats' && (
-              <ContratsTab
-                contracts={contrats}
-                setContrats={setContrats}
-                api={`${API_URL}/contrats`}
-              />
-            )}
-            {activeTab === 'entrepots' && (
-              <EntrepotsTab
-                entrepots={entrepots}
-                setEntrepots={setEntrepots}
-                api={`${API_URL}/entrepots`}
-              />
-            )}
-            {activeTab === 'recettes' && (
-              <RecettesTab
-                recettes={recettes}
-                setRecettes={setRecettes}
-                api={`${API_URL}/recettes`}
-              />
-            )}
-            {activeTab === 'depenses' && (
-              <DepensesTab
-                depenses={depenses}
-                setDepenses={setDepenses}
-                api={`${API_URL}/depenses`}
-              />
-            )}
-            {activeTab === 'achats' && (
-              <AchatsTab
-                achats={achats}
-                setAchats={setAchats}
-                api={`${API_URL}/achats`}
-              />
-            )}
-            {activeTab === 'ventes' && (
-              <VentesTab
-                ventes={ventes}
-                setVentes={setVentes}
-                api={`${API_URL}/ventes`}
-              />
-            )}
-            {activeTab === 'factures' && (
-              <FacturesTab
-                factures={factures}
-                setFactures={setFactures}
-                api={`${API_URL}/factures`}
-              />
-            )}
-            {activeTab === 'quittances' && (
-              <QuittancesTab
-                quittances={quittances}
-                setQuittances={setQuittances}
-                api={`${API_URL}/quittances`}
-              />
+            {loadingData ? (
+              <div className="text-center p-8">
+                <p className="text-xl font-semibold">Chargement des données...</p>
+              </div>
+            ) : (
+              <>
+                {activeTab === 'dashboard' && (
+                  <DashboardTab 
+                    stock={stockItems} 
+                    payments={payments} 
+                  />
+                )}
+                {activeTab === 'stock' && (
+                  <StockManagementTab
+                    items={stockItems}
+                    setItems={setStockItems}
+                    api={`${API_URL}/stock`}
+                  />
+                )}
+                {activeTab === 'employees' && (
+                  <EmployeesTab
+                    employees={employees}
+                    setEmployees={setEmployees}
+                    api={`${API_URL}/employees`}
+                  />
+                )}
+                {activeTab === 'suppliers' && (
+                  <SuppliersTab
+                    suppliers={suppliers}
+                    setSuppliers={setSuppliers}
+                    api={`${API_URL}/suppliers`}
+                  />
+                )}
+                {activeTab === 'customers' && (
+                  <CustomersTab
+                    customers={customers}
+                    setCustomers={setCustomers}
+                    api={`${API_URL}/customers`}
+                  />
+                )}
+                {activeTab === 'payments' && (
+                  <PaymentsTab
+                    payments={payments}
+                    customers={customers}
+                    employees={employees}
+                    api={`${API_URL}/payments`}
+                    refetchPayments={fetchAll}
+                  />
+                )}
+                {activeTab === 'produits' && (
+                  <ProduitsTab
+                    produits={produits}
+                    setProduits={setProduits}
+                    api={`${API_URL}/produits`}
+                    refetchProduits={fetchAll}
+                  />
+                )}
+                {activeTab === 'contrats' && (
+                  <ContratsTab
+                    contrats={contrats}
+                    setContrats={setContrats}
+                    api={`${API_URL}/contrats`}
+                  />
+                )}
+                {activeTab === 'entrepots' && (
+                  <EntrepotsTab
+                    entrepots={entrepots}
+                    setEntrepots={setEntrepots}
+                    api={`${API_URL}/entrepots`}
+                  />
+                )}
+                {activeTab === 'recettes' && (
+                  <RecettesTab
+                    recettes={recettes}
+                    setRecettes={setRecettes}
+                    produits={produits}
+                    setProduits={setProduits}
+                    customers={customers}
+                    setCustomers={setCustomers}
+                    contrats={contrats}
+                    setContrats={setContrats}
+                    api={`${API_URL}`}
+                    refetchRecettes={fetchAll}
+                  />
+                )}
+                {activeTab === 'depenses' && (
+                  <DepensesTab
+                    depenses={depenses}
+                    setDepenses={setDepenses}
+                    api={`${API_URL}/depenses`}
+                  />
+                )}
+                {activeTab === 'achats' && (
+                  <AchatsTab
+                    achats={achats}
+                    setAchats={setAchats}
+                    api={`${API_URL}/achats`}
+                  />
+                )}
+                {activeTab === 'ventes' && (
+                  <VentesTab
+                    ventes={ventes}
+                    setVentes={setVentes}
+                    api={`${API_URL}/ventes`}
+                  />
+                )}
+                {activeTab === 'factures' && (
+                  <FacturesTab
+                    factures={factures}
+                    setFactures={setFactures}
+                    api={`${API_URL}/factures`}
+                  />
+                )}
+                {activeTab === 'quittances' && (
+                  <QuittancesTab
+                    quittances={quittances}
+                    setQuittances={setQuittances}
+                    api={`${API_URL}/quittances`}
+                  />
+                )}
+              </>
             )}
           </main>
         </div>
