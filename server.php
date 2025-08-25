@@ -54,14 +54,9 @@ if (file_exists($staticFile) && ! is_dir($staticFile)) {
 // Assurez-vous que le fichier est un fichier PHP (pas de .htaccess, .css, etc. qui devraient être servis statiquement)
 // Et qu'il existe réellement.
 if (pathinfo($filePath, PATHINFO_EXTENSION) === 'php' && file_exists($filePath)) {
-    // Si c'est un fichier PHP valide dans le dossier public, nous l'incluons.
-    // Cela permet à admin_dashboard.php, login.php, etc. d'être exécutés.
-    // Important: __DIR__ à l'intérieur du fichier inclus sera le dossier du fichier inclus.
-    // $_SERVER['SCRIPT_FILENAME'] et $_SERVER['PHP_SELF'] devront être ajustés si nécessaire
-    // pour que le fichier inclus pense qu'il est exécuté directement.
     $_SERVER['SCRIPT_FILENAME'] = $filePath;
     $_SERVER['SCRIPT_NAME']     = $uri; // Rend l'URI originale disponible comme nom de script
-                                        // Note: $_SERVER['PHP_SELF'] peut être problématique, utilisez SCRIPT_NAME ou REQUEST_URI
+    // Note: $_SERVER['PHP_SELF'] peut être problématique, utilisez SCRIPT_NAME ou REQUEST_URI
 
     require $filePath;
     exit; // Arrête l'exécution après avoir servi le fichier PHP d'administration

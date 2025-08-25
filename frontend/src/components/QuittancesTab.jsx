@@ -13,7 +13,6 @@ function QuittancesTab({ quittances: initialQuittances, setQuittances, api }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false); // Nouvel état pour les opérations de sauvegarde
   const [error, setError] = useState(null);
-  const [employees, setEmployees] = useState([]);
 
   // États pour les modales de création/édition
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -28,37 +27,6 @@ function QuittancesTab({ quittances: initialQuittances, setQuittances, api }) {
   // État pour la recherche
   const [search, setSearch] = useState('');
 
-  // Fonction pour récupérer les données des employés
-  const fetchEmployees = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`${api}/employees`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de la récupération des employés.');
-      }
-      const resultEmployees = await response.json();
-
-      console.log(resultEmployees);
-
-      if (resultEmployees && Array.isArray(resultEmployees.data)) {
-        setEmployees(resultEmployees.data);
-      } else {
-        console.warn('La réponse de l\'API n\'a pas retourné un tableau d\'employés :', resultEmployees);
-        setEmployees([]);
-      }
-    } catch (err) {
-      console.error('Erreur lors du chargement des employés :', err);
-      setError(`Impossible de charger les employés. Détails: ${err.message || err.toString()}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [api, token, setEmployees]);
 
   // Fonction pour charger les quittances (Read)
   const fetchQuittances = useCallback(async () => {
@@ -89,34 +57,19 @@ function QuittancesTab({ quittances: initialQuittances, setQuittances, api }) {
     }
   }, [api, token, setQuittances]);
 
-  // Charge les employés et les quittances au montage du composant
+  // Charge les quittances au montage du composant
   useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
-
-    useEffect(() => {
     fetchQuittances();
   }, [fetchQuittances]);
   
   //console.log('LOG 0 : ', employees ); //LOG
 
-  // Fonction utilitaire pour trouver le nom d'un employé
-  const getEmployeeName = (employeeId) => {
-    if (!Array.isArray(employees)) {
-      return 'Inconnu';
-    }
-    const employee = employees.find(e => e.id === employeeId);
-    return employee ? `${employee.name}` : 'Inconnu';
-  };
-
-
   // Filtrer les quittances pour la recherche
   const filteredQuittances = (Array.isArray(initialQuittances) ? initialQuittances : []).filter((quittance) => {
-    const employeeName = getEmployeeName(quittance.employee_id);
     return (
       quittance.periode_service?.toLowerCase().includes(search.toLowerCase()) ||
       quittance.type?.toLowerCase().includes(search.toLowerCase()) ||
-      employeeName.toLowerCase().includes(search.toLowerCase())
+      quittance.employee_name?.toLowerCase().includes(search.toLowerCase())
     );
   });
 
@@ -291,7 +244,7 @@ function QuittancesTab({ quittances: initialQuittances, setQuittances, api }) {
                 {filteredQuittances.map((quittance) => (
                   <tr key={quittance.id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">{quittance.id}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{getEmployeeName(quittance.employee_id)}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{quittance.employee_name}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
                       {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(quittance.montant)}
                     </td>
@@ -330,7 +283,7 @@ function QuittancesTab({ quittances: initialQuittances, setQuittances, api }) {
         <CreateQuittanceModal
           onClose={closeCreateModal}
           onSave={handleCreateQuittance}
-          employees={employees}
+          employees={[]}
           loading={saving}
         />
       )}
@@ -341,7 +294,7 @@ function QuittancesTab({ quittances: initialQuittances, setQuittances, api }) {
           onClose={closeEditModal}
           onSave={handleUpdateQuittance}
           quittanceToEdit={currentQuittance}
-          employees={employees}
+          employees={[]}
           loading={saving}
         />
       )}

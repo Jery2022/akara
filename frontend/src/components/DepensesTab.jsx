@@ -9,19 +9,9 @@ import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
   const token = localStorage.getItem('authToken');
 
-  console.log('log init :', initialDepenses); //LOG
-
-  // Synchroniser l'état local avec la prop externe si elle change
-  const [depenses, setLocalDepenses] = useState(Array.isArray(initialDepenses) ? initialDepenses : []);
-  
-  useEffect(() => {
-    if (Array.isArray(initialDepenses)) { 
-      setLocalDepenses(initialDepenses); 
-    } 
-  }, [initialDepenses]);
-
   // États pour la gestion du chargement et des erreurs
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   // États pour les modales de création/édition
@@ -42,7 +32,7 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/depenses`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -52,7 +42,6 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
         throw new Error(`Erreur HTTP: ${response.status} - ${errorBody.message || response.statusText}`);
       }
       const result = await response.json();
-
       if (result && Array.isArray(result.data)) {
         setDepenses(result.data);
       } else {
@@ -72,16 +61,12 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
     fetchDepenses();
   }, [fetchDepenses]);
 
-console.log('LOG 2 :', depenses);
-
   // Filtrer les dépenses pour la recherche
-  const filteredDepenses = depenses?.filter((depense) =>
+  const filteredDepenses = (Array.isArray(initialDepenses) ? initialDepenses : []).filter((depense) =>
     depense.description?.toLowerCase().includes(search.toLowerCase()) ||
     depense.nature?.toLowerCase().includes(search.toLowerCase()) ||
-    depense.category?.toLowerCase().includes(search.toLowerCase())  
+    depense.category?.toLowerCase().includes(search.toLowerCase())
   );
-
-  console.log('LOG 3 : ', filteredDepenses.length);
 
   // --- Fonctions pour les modales ---
   const openCreateModal = () => setIsCreateModalOpen(true);
@@ -91,7 +76,6 @@ console.log('LOG 2 :', depenses);
     setCurrentDepense(depense);
     setIsEditModalOpen(true);
   };
-
   const closeEditModal = () => {
     setIsEditModalOpen(false);
     setCurrentDepense(null);
@@ -101,8 +85,9 @@ console.log('LOG 2 :', depenses);
 
   // Gère la création d'une nouvelle dépense
   const handleCreateDepense = async (newDepenseData) => {
+    setSaving(true);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/depenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,13 +107,16 @@ console.log('LOG 2 :', depenses);
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de l'ajout de la dépense: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la mise à jour d'une dépense
   const handleUpdateDepense = async (updatedDepenseData) => {
+    setSaving(true);
     try {
-      const response = await fetch(`${api}/${updatedDepenseData.id}`, {
+      const response = await fetch(`${api}/depenses/${updatedDepenseData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -148,14 +136,17 @@ console.log('LOG 2 :', depenses);
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de la mise à jour de la dépense: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la suppression d'une dépense
   const handleDelete = (depenseId) => {
     setConfirmAction(() => async () => {
+      setSaving(true);
       try {
-        const response = await fetch(`${api}/${depenseId}`, {
+        const response = await fetch(`${api}/depenses/${depenseId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -175,6 +166,7 @@ console.log('LOG 2 :', depenses);
       } finally {
         setShowConfirmModal(false);
         setConfirmAction(null);
+        setSaving(false);
       }
     });
     setShowConfirmModal(true);
@@ -219,6 +211,7 @@ console.log('LOG 2 :', depenses);
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            disabled={saving}
           >
             <PlusCircle size={20} />
             <span>Ajouter une dépense</span>
@@ -256,6 +249,7 @@ console.log('LOG 2 :', depenses);
                           onClick={() => openEditModal(depense)}
                           className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
                           aria-label="Modifier la dépense"
+                          disabled={saving}
                         >
                           <Pencil size={20} />
                         </button>
@@ -263,6 +257,7 @@ console.log('LOG 2 :', depenses);
                           onClick={() => handleDelete(depense.id)}
                           className="text-red-600 hover:text-red-900 transition-colors duration-150"
                           aria-label="Supprimer la dépense"
+                          disabled={saving}
                         >
                           <Trash2 size={20} />
                         </button>
@@ -281,6 +276,7 @@ console.log('LOG 2 :', depenses);
         <CreateDepenseModal
           onClose={closeCreateModal}
           onSave={handleCreateDepense}
+          loading={saving}
         />
       )}
       
@@ -290,6 +286,7 @@ console.log('LOG 2 :', depenses);
           onClose={closeEditModal}
           onSave={handleUpdateDepense}
           depenseToEdit={currentDepense}
+          loading={saving}
         />
       )}
 

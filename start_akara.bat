@@ -6,7 +6,7 @@ echo [DEBUG] Le dossier racine du projet est : "%PROJECT_ROOT%"
 
 REM --- Confirmez le chemin de PHP.exe (il manquait dans votre version) ---
 REM C'est crucial que php.exe soit trouvé, sinon le serveur ne démarre pas.
-set PHP_EXE="D:\wamp64\bin\php\php8.2.0\php.exe"
+set PHP_EXE="C:\xampp\php\php.exe"
 echo [DEBUG] Le chemin de PHP.exe est défini à : %PHP_EXE%
 if not exist %PHP_EXE% (
     echo [ERREUR] php.exe n'a pas été trouvé à %PHP_EXE%. VEUILLEZ VÉRIFIER CE CHEMIN ET LE CORRIGER.
