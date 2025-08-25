@@ -6,80 +6,67 @@ import EditProduitModal from './utils/EditProduitModal';
 import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 
 // Composant de l'onglet Produits
-function ProduitsTab({ produits:initialProduits, setProduits, api }) {
-  const token = localStorage.getItem('authToken');
+function ProduitsTab({ produits: initialProduits, setProduits, api }) {
+  const token = localStorage.getItem('authToken');
 
-  // Initialiser l'état local des produits avec un tableau vide pour éviter l'erreur .filter
-  const [produits, setLocalProduits] = useState(Array.isArray(initialProduits) ? initialProduits : []);
+  // États pour la gestion du chargement et des erreurs
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Synchroniser l'état local avec la prop externe si elle change
-  useEffect(() => {
-    if (Array.isArray(initialProduits)) { 
-      setLocalProduits(initialProduits); 
-    }
-  }, [initialProduits]);
+  // États pour les modales de création/édition
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentProduit, setCurrentProduit] = useState(null);
 
-  // États pour la gestion du chargement et des erreurs
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // États pour les messages et la confirmation
+  const [message, setMessage] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
-  // États pour les modales de création/édition
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentProduit, setCurrentProduit] = useState(null);
+  // État pour la recherche
+  const [search, setSearch] = useState('');
 
-  // États pour les messages et la confirmation
-  const [message, setMessage] = useState(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
+  // Fonction pour charger les produits (Read)
+  const fetchProduits = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${api}/produits`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(`Erreur HTTP: ${response.status} - ${errorBody.message || response.statusText}`);
+      }
+      const result = await response.json();
+      if (result && Array.isArray(result.data)) {
+        setProduits(result.data);
+      } else {
+        console.warn('La réponse de l\'API n\'a pas retourné un tableau de produits :', result);
+        setProduits([]);
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des produits :', err);
+      setError(`Impossible de charger les produits. Détails: ${err.message || err.toString()}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [api, token, setProduits]);
 
-  // État pour la recherche
-  const [search, setSearch] = useState('');
+  // Charger les produits au montage du composant
+  useEffect(() => {
+    fetchProduits();
+  }, [fetchProduits]);
 
-  // Fonction pour charger les produits (Read)
-  const fetchProduits = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(api, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur HTTP: ${response.status} - ${errorBody.message || response.statusText}`);
-      }
-      const result = await response.json();
+  // Filtrer les produits pour la recherche
+  const filteredProduits = (Array.isArray(initialProduits) ? initialProduits : []).filter((produit) =>
+    produit.name?.toLowerCase().includes(search.toLowerCase()) ||
+    produit.description?.toLowerCase().includes(search.toLowerCase())
+  );
 
-      //console.log(result.data); //log pour débogage
-
-      // Vérification que la propriété 'data' est un tableau
-      if (result && Array.isArray(result.data)) {
-        setProduits(result.data);
-      } else {
-        console.warn('La réponse de l\'API n\'a pas retourné un tableau de produits :', result);
-        setProduits([]);
-      }
-    } catch (err) {
-      console.error('Erreur lors du chargement des produits :', err);
-      setError(`Impossible de charger les produits. Détails: ${err.message || err.toString()}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [api, token, setProduits]);
-
-  // Charger les produits au montage du composant 
-  useEffect(() => {
-    fetchProduits();
-  }, [fetchProduits]);
-
-  // Filtrer les produits pour la recherche
-  const filteredProduits = (produits || []).filter((produit) =>
-    produit.name?.toLowerCase().includes(search.toLowerCase()) ||
-    produit.description?.toLowerCase().includes(search.toLowerCase())
-  );
-  
   // --- Fonctions pour les modales ---
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
@@ -97,8 +84,9 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
 
   // Gère la création d'un nouveau produit
   const handleCreateProduit = async (newProduitData) => {
+    setSaving(true);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/produits`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,13 +106,16 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de l'ajout du produit: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la mise à jour d'un produit
   const handleUpdateProduit = async (updatedProduitData) => {
+    setSaving(true);
     try {
-      const response = await fetch(`${api}/${updatedProduitData.id}`, {
+      const response = await fetch(`${api}/produits/${updatedProduitData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -144,14 +135,17 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de la mise à jour du produit: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la suppression d'un produit
   const handleDelete = (produitId) => {
     setConfirmAction(() => async () => {
+      setSaving(true);
       try {
-        const response = await fetch(`${api}/${produitId}`, {
+        const response = await fetch(`${api}/produits/${produitId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -171,6 +165,7 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
       } finally {
         setShowConfirmModal(false);
         setConfirmAction(null);
+        setSaving(false);
       }
     });
     setShowConfirmModal(true);
@@ -194,14 +189,14 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
 
   if (error) {
     return (
-        <div className="text-center text-red-600 dark:text-red-400">{error}</div>
+      <div className="text-center text-red-600 dark:text-red-400">{error}</div>
     );
   }
-
+  
   return (
     <div className="min-h-screen bg-gray-100 p-4 font-sans antialiased">
-       <h2 className="text-2xl font-bold text-emerald-700 flex items-center mb-4">
-          Gestion des Produits
+      <h2 className="text-2xl font-bold text-emerald-700 flex items-center mb-4">
+        Gestion des Produits
       </h2>
       <header className="bg-white shadow-md rounded-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
         <div className="w-full md:w-auto flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
@@ -215,6 +210,7 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            disabled={saving}
           >
             <PlusCircle size={20} />
             <span>Ajouter un produit</span>
@@ -252,6 +248,7 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
                           onClick={() => openEditModal(produit)}
                           className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
                           aria-label="Modifier le produit"
+                          disabled={saving}
                         >
                           <Pencil size={20} />
                         </button>
@@ -259,6 +256,7 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
                           onClick={() => handleDelete(produit.id)}
                           className="text-red-600 hover:text-red-900 transition-colors duration-150"
                           aria-label="Supprimer le produit"
+                          disabled={saving}
                         >
                           <Trash2 size={20} />
                         </button>
@@ -277,6 +275,7 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
         <CreateProduitModal
           onClose={closeCreateModal}
           onSave={handleCreateProduit}
+          loading={saving}
         />
       )}
       
@@ -286,6 +285,7 @@ function ProduitsTab({ produits:initialProduits, setProduits, api }) {
           onClose={closeEditModal}
           onSave={handleUpdateProduit}
           produitToEdit={currentProduit}
+          loading={saving}
         />
       )}
 

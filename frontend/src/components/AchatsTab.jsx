@@ -9,17 +9,10 @@ import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 function AchatsTab({ achats: initialAchats, setAchats, api }) {
   const token = localStorage.getItem('authToken');
 
-  // Synchroniser l'état local avec la prop externe si elle change
-  const [achats, setLocalAchats] = useState(Array.isArray(initialAchats) ? initialAchats : []);
-  
-  useEffect(() => {
-    if (Array.isArray(initialAchats)) { 
-      setLocalAchats(initialAchats); 
-    }
-  }, [initialAchats]);
 
   // États pour la gestion du chargement et des erreurs
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   // États pour les modales de création/édition
@@ -40,7 +33,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/achats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -70,9 +63,9 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
   }, [fetchAchats]);
 
   // Filtrer les achats pour la recherche
-  const filteredAchats = (achats || []).filter((achat) =>
-    achat.fournisseur?.toLowerCase().includes(search.toLowerCase()) ||
-    achat.montant?.toString().includes(search)
+  const filteredAchats = (Array.isArray(initialAchats) ? initialAchats : []).filter((achat) =>
+    achat.description?.toLowerCase().includes(search.toLowerCase()) ||
+    achat.amount?.toString().includes(search)
   );
 
   // --- Fonctions pour les modales ---
@@ -92,8 +85,9 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
 
   // Gère la création d'un nouvel achat
   const handleCreateAchat = async (newAchatData) => {
+    setSaving(true);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/achats`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,13 +107,16 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'achat: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la mise à jour d'un achat
   const handleUpdateAchat = async (updatedAchatData) => {
+    setSaving(true);
     try {
-      const response = await fetch(`${api}/${updatedAchatData.id}`, {
+      const response = await fetch(`${api}/achats/${updatedAchatData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -139,14 +136,17 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de la mise à jour de l'achat: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la suppression d'un achat
   const handleDelete = (achatId) => {
     setConfirmAction(() => async () => {
+      setSaving(true);
       try {
-        const response = await fetch(`${api}/${achatId}`, {
+        const response = await fetch(`${api}/achats/${achatId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -166,6 +166,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
       } finally {
         setShowConfirmModal(false);
         setConfirmAction(null);
+        setSaving(false);
       }
     });
     setShowConfirmModal(true);
@@ -210,6 +211,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            disabled={saving}
           >
             <PlusCircle size={20} />
             <span>Ajouter un achat</span>
@@ -226,9 +228,9 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
               <thead className="bg-gray-200">
                 <tr>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">ID</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Fournisseur</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Description</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Montant</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Date</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Date d'achat</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -236,17 +238,18 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
                 {filteredAchats.map((achat) => (
                   <tr key={achat.id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">{achat.id}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{achat.fournisseur}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{achat.description}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
-                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(achat.montant)}
+                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(achat.amount)}
                     </td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{achat.date}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{achat.date_achat}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => openEditModal(achat)}
                           className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
                           aria-label="Modifier l'achat"
+                          disabled={saving}
                         >
                           <Pencil size={20} />
                         </button>
@@ -254,6 +257,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
                           onClick={() => handleDelete(achat.id)}
                           className="text-red-600 hover:text-red-900 transition-colors duration-150"
                           aria-label="Supprimer l'achat"
+                          disabled={saving}
                         >
                           <Trash2 size={20} />
                         </button>
@@ -272,6 +276,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
         <CreateAchatModal
           onClose={closeCreateModal}
           onSave={handleCreateAchat}
+          loading={saving}
         />
       )}
       
@@ -281,6 +286,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
           onClose={closeEditModal}
           onSave={handleUpdateAchat}
           achatToEdit={currentAchat}
+          loading={saving}
         />
       )}
 

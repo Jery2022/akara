@@ -9,17 +9,10 @@ import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 function FacturesTab({ factures: initialFactures, setFactures, api }) {
   const token = localStorage.getItem('authToken');
 
-  // Synchroniser l'état local avec la prop externe si elle change
-  const [factures, setLocalFactures] = useState(Array.isArray(initialFactures) ? initialFactures : []);
-  
-  useEffect(() => {
-    if (Array.isArray(initialFactures)) { 
-      setLocalFactures(initialFactures); 
-    }
-  }, [initialFactures]);
 
   // États pour la gestion du chargement et des erreurs
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   // États pour les modales de création/édition
@@ -40,7 +33,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/factures`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -70,9 +63,9 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
   }, [fetchFactures]);
 
   // Filtrer les factures pour la recherche
-  const filteredFactures = (factures || []).filter((facture) =>
-    facture.client?.toLowerCase().includes(search.toLowerCase()) ||
-    facture.montant?.toString().includes(search)
+  const filteredFactures = (Array.isArray(initialFactures) ? initialFactures : []).filter((facture) =>
+    facture.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+    facture.amount_ttc?.toString().includes(search)
   );
 
   // --- Fonctions pour les modales ---
@@ -92,8 +85,9 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
 
   // Gère la création d'une nouvelle facture
   const handleCreateFacture = async (newFactureData) => {
+    setSaving(true);
     try {
-      const response = await fetch(api, {
+      const response = await fetch(`${api}/factures`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -113,13 +107,16 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de l'ajout de la facture: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la mise à jour d'une facture
   const handleUpdateFacture = async (updatedFactureData) => {
+    setSaving(true);
     try {
-      const response = await fetch(`${api}/${updatedFactureData.id}`, {
+      const response = await fetch(`${api}/factures/${updatedFactureData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -139,14 +136,17 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
     } catch (err) {
       setMessage({ type: 'error', text: `Erreur lors de la mise à jour de la facture: ${err.message || err.toString()}` });
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
   // Gère la suppression d'une facture
   const handleDelete = (factureId) => {
     setConfirmAction(() => async () => {
+      setSaving(true);
       try {
-        const response = await fetch(`${api}/${factureId}`, {
+        const response = await fetch(`${api}/factures/${factureId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -166,6 +166,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
       } finally {
         setShowConfirmModal(false);
         setConfirmAction(null);
+        setSaving(false);
       }
     });
     setShowConfirmModal(true);
@@ -210,6 +211,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            disabled={saving}
           >
             <PlusCircle size={20} />
             <span>Ajouter une facture</span>
@@ -227,8 +229,8 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
                 <tr>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">ID</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Client</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Montant</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Date</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Montant TTC</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Date de facture</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -236,17 +238,18 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
                 {filteredFactures.map((facture) => (
                   <tr key={facture.id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">{facture.id}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{facture.client}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{facture.customer_name}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">
-                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(facture.montant)}
+                      {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(facture.amount_ttc)}
                     </td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{facture.date}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{facture.date_facture}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => openEditModal(facture)}
                           className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
                           aria-label="Modifier la facture"
+                          disabled={saving}
                         >
                           <Pencil size={20} />
                         </button>
@@ -254,6 +257,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
                           onClick={() => handleDelete(facture.id)}
                           className="text-red-600 hover:text-red-900 transition-colors duration-150"
                           aria-label="Supprimer la facture"
+                          disabled={saving}
                         >
                           <Trash2 size={20} />
                         </button>
@@ -272,6 +276,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
         <CreateFactureModal
           onClose={closeCreateModal}
           onSave={handleCreateFacture}
+          loading={saving}
         />
       )}
       
@@ -281,6 +286,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
           onClose={closeEditModal}
           onSave={handleUpdateFacture}
           factureToEdit={currentFacture}
+          loading={saving}
         />
       )}
 
@@ -299,4 +305,4 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
   );
 }
 
-export default FacturesTab; 
+export default FacturesTab;

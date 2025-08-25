@@ -147,60 +147,64 @@ function authenticateRequest(): ?object
 }
 
 // --- DÉBUT DU ROUTAGE PRINCIPAL ---
+try {
+    $uri       = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $apiPrefix = '/backend/api';
 
-$uri       = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$apiPrefix = '/backend/api';
-
-// Supprime le préfixe de l'API de l'URI pour obtenir le chemin de la route interne.
-if (strpos($uri, $apiPrefix) === 0) {
-    $uri = substr($uri, strlen($apiPrefix));
-}
-
-// Divise l'URI en segments et nettoie les segments vides.
-$routeSegments = array_values(array_filter(explode('/', trim($uri, '/'))));
-
-$endpoint = $routeSegments[0] ?? '';
-$id       = null;
-if (isset($routeSegments[1]) && is_numeric($routeSegments[1])) {
-    $id = (int) $routeSegments[1];
-}
-$params = ['id' => $id];
-
-$method = $_SERVER['REQUEST_METHOD'];
-
-// Définition des routes publiques (qui ne nécessitent pas d'authentification)
-$publicRoutes = ['auth'];
-
-$currentUser = null;
-
-// Application du middleware d'authentification si la route n'est pas publique
-if (! in_array($endpoint, $publicRoutes)) {
-    $currentUser = authenticateRequest(); // Si l'authentification échoue, un exit est appelé ici.
-}
-
-// Logique de chargement des handlers de route
-if (! empty($endpoint)) {
-                                     // Les routes "core" sont celles qui sont directement dans backend/api/ (ex: auth.php, me.php)
-    $coreApiRoutes = ['auth', 'me']; // 'me' devrait être protégé si c'est pour l'utilisateur courant
-
-    if (in_array($endpoint, $coreApiRoutes)) {
-        loadRouteFile(__DIR__ . '/' . $endpoint . '.php', $method, $params, $currentUser);
-    } else {
-        // Toutes les autres routes (ex: 'users', 'products', 'suppliers')
-        // sont censées se trouver dans le sous-dossier 'routes/'.
-        $filePath = __DIR__ . '/routes/' . $endpoint . '.php';
-
-        // Détermine la méthode à appeler dans le fichier de route.
-        // Si un ID est présent, la méthode peut être suffixée par '_ID' (ex: 'GET_ID').
-        // C'est une convention que vous avez choisie et que vos fichiers de route doivent respecter.
-        $methodToCall = $method;
-        if ($id !== null) {
-            $methodToCall = $method . '_ID';
-        }
-
-        loadRouteFile($filePath, $methodToCall, $params, $currentUser);
+    // Supprime le préfixe de l'API de l'URI pour obtenir le chemin de la route interne.
+    if (strpos($uri, $apiPrefix) === 0) {
+        $uri = substr($uri, strlen($apiPrefix));
     }
-} else {
-    // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/),
-    Response::json(['message' => 'Bienvenue sur votre API RESTful !', 'version' => '1.0'], 200);
+
+    // Divise l'URI en segments et nettoie les segments vides.
+    $routeSegments = array_values(array_filter(explode('/', trim($uri, '/'))));
+
+    $endpoint = $routeSegments[0] ?? '';
+    $id       = null;
+    if (isset($routeSegments[1]) && is_numeric($routeSegments[1])) {
+        $id = (int) $routeSegments[1];
+    }
+    $params = ['id' => $id];
+
+    $method = $_SERVER['REQUEST_METHOD'];
+
+    // Définition des routes publiques (qui ne nécessitent pas d'authentification)
+    $publicRoutes = ['auth'];
+
+    $currentUser = null;
+
+    // Application du middleware d'authentification si la route n'est pas publique
+    if (! in_array($endpoint, $publicRoutes)) {
+        $currentUser = authenticateRequest(); // Si l'authentification échoue, un exit est appelé ici.
+    }
+
+    // Logique de chargement des handlers de route
+    if (! empty($endpoint)) {
+        // Les routes "core" sont celles qui sont directement dans backend/api/ (ex: auth.php, me.php)
+        $coreApiRoutes = ['auth', 'me']; // 'me' devrait être protégé si c'est pour l'utilisateur courant
+
+        if (in_array($endpoint, $coreApiRoutes)) {
+            loadRouteFile(__DIR__ . '/' . $endpoint . '.php', $method, $params, $currentUser);
+        } else {
+            // Toutes les autres routes (ex: 'users', 'products', 'suppliers')
+            // sont censées se trouver dans le sous-dossier 'routes/'.
+            $filePath = __DIR__ . '/routes/' . $endpoint . '.php';
+
+            // Détermine la méthode à appeler dans le fichier de route.
+            // Si un ID est présent, la méthode peut être suffixée par '_ID' (ex: 'GET_ID').
+            // C'est une convention que vous avez choisie et que vos fichiers de route doivent respecter.
+            $methodToCall = $method;
+            if ($id !== null) {
+                $methodToCall = $method . '_ID';
+            }
+
+            loadRouteFile($filePath, $methodToCall, $params, $currentUser);
+        }
+    } else {
+        // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/),
+        Response::json(['message' => 'Bienvenue sur votre API RESTful !', 'version' => '1.0'], 200);
+    }
+} catch (\Throwable $e) {
+    error_log('Unhandled exception in router: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+    Response::error('Une erreur inattendue est survenue.', 500);
 }

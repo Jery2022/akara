@@ -154,7 +154,7 @@ return [
             $sql = "INSERT INTO ventes (type, amount, date_vente, category, user_id, customer_id, contrat_id, description) 
                     VALUES (:type, :amount, :date_vente, :category, :user_id, :customer_id, :contrat_id, :description)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':type'        => $type,
                 ':amount'      => $amount,
@@ -171,7 +171,13 @@ return [
                 return;
             }
 
-            Response::created('Vente ajoutée avec succès.', ['id' => $pdo->lastInsertId()]);
+            $lastId = $pdo->lastInsertId();
+            if ($lastId === false) {
+                Response::error('Erreur lors de la récupération de l\'ID de la nouvelle vente.', 500);
+                return;
+            }
+
+            Response::created(['id' => $lastId], 'Vente ajoutée avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating vente: ' . $e->getMessage());
             Response::error('Erreur lors de la création de la vente.', 500, ['details' => $e->getMessage()]);
@@ -244,7 +250,7 @@ return [
                         description = :description 
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':type'        => $type,
                 ':amount'      => $amount,
@@ -299,7 +305,7 @@ return [
         try {
             $sql = "DELETE FROM ventes WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {
