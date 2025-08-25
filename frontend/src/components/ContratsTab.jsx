@@ -211,7 +211,7 @@ function ContratsTab({ contrats: initialContrats, setContrats, api }) {
           />
           <button
             onClick={openCreateModal}
-            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600  text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
             disabled={saving}
           >
             <PlusCircle size={20} />
