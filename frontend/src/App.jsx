@@ -55,7 +55,6 @@ export default function App() {
         // Si pas de token, l'utilisateur n'est pas authentifié
         setUser(null);
         setLoading(false); // Désactivez le loading
-        // Ne pas toucher à loadingData ici, il sera géré dans le prochain useEffect
         return;
       }
 
@@ -172,7 +171,9 @@ export default function App() {
             },
           });
           if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
-          return await res.json();
+          const jsonResponse = await res.json();
+          // S'assurer que la propriété 'data' existe et est un tableau
+          return Array.isArray(jsonResponse.data) ? jsonResponse.data : [];
         })
       );
 
@@ -190,7 +191,7 @@ export default function App() {
         ventes,
         factures,
         quittances,
-        payments
+        payments,
       ] = responses;
 
       setStockItems(stock);
@@ -394,9 +395,10 @@ export default function App() {
             ) : (
               <>
                 {activeTab === 'dashboard' && (
-                  <DashboardTab 
-                    stock={stockItems} 
-                    payments={payments} 
+                  <DashboardTab
+                    stock={stockItems}
+                    recettes={recettes}
+                    depenses={depenses}
                   />
                 )}
                 {activeTab === 'stock' && (
@@ -430,6 +432,7 @@ export default function App() {
                 {activeTab === 'payments' && (
                   <PaymentsTab
                     payments={payments}
+                    setPayments={setPayments}
                     customers={customers}
                     employees={employees}
                     api={`${API_URL}/payments`}
