@@ -196,18 +196,18 @@ function SuppliersTab({ suppliers: initialSuppliers, setSuppliers, api }) {
   }
   
   return (
-    <div className="min-h-screen bg-gray-100 p-4 font-sans antialiased">
-      <h2 className="text-2xl font-bold text-emerald-700 flex items-center mb-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4 font-sans antialiased">
+      <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 flex items-center mb-4">
         Gestion des Fournisseurs
       </h2>
-      <header className="bg-white shadow-md rounded-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+      <header className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
         <div className="w-full md:w-auto flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
           <input
             type="text"
             placeholder="Rechercher un fournisseur..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-64 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
           <button
             onClick={openCreateModal}
@@ -220,35 +220,35 @@ function SuppliersTab({ suppliers: initialSuppliers, setSuppliers, api }) {
         </div>
       </header>
 
-      <div className="bg-white shadow-md rounded-lg p-6">
+      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
         {filteredSuppliers.length === 0 ? (
-          <p className="text-center text-gray-500">Aucun fournisseur trouvé.</p>
+          <p className="text-center text-gray-500 dark:text-gray-400">Aucun fournisseur trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white rounded-md overflow-hidden">
-              <thead className="bg-gray-200">
+            <table className="min-w-full">
+              <thead className="bg-gray-200 dark:bg-gray-700">
                 <tr>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Nom</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Réf. Contact</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Téléphone</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Email</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">ID Contrat</th>
-                  <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Nom</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Réf. Contact</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Téléphone</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">ID Contrat</th>
+                  <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{supplier.name}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{supplier.refContact}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{supplier.phone}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{supplier.email}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{supplier.contrat_id || 'N/A'}</td>
+                  <tr key={supplier.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{supplier.name}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{supplier.refContact}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{supplier.phone}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{supplier.email}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{supplier.contrat_id || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => openEditModal(supplier)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors duration-150"
                           aria-label="Modifier le fournisseur"
                           disabled={saving}
                         >
@@ -256,7 +256,7 @@ function SuppliersTab({ suppliers: initialSuppliers, setSuppliers, api }) {
                         </button>
                         <button
                           onClick={() => handleDelete(supplier.id)}
-                          className="text-red-600 hover:text-red-900 transition-colors duration-150"
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 transition-colors duration-150"
                           aria-label="Supprimer le fournisseur"
                           disabled={saving}
                         >
