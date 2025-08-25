@@ -2,13 +2,14 @@ import Card from './Card';
 import ChartSection from './ChartSection';
 
 // Dashboard Component
-function DashboardTab({ stock, payments }) {
+function DashboardTab({ stock, recettes, depenses }) {
   // Utilisez Array.isArray pour une vérification plus robuste
   const isStockArray = Array.isArray(stock);
-  const isPaymentsArray = Array.isArray(payments);
+  const isRecettesArray = Array.isArray(recettes);
+  const isDepensesArray = Array.isArray(depenses);
   
   // Afficher un message de chargement si les données ne sont pas encore prêtes
-  if (!isStockArray || !isPaymentsArray) {
+  if (!isStockArray || !isRecettesArray || !isDepensesArray) {
     return (
       <div className="flex items-center justify-center p-8">
         <p className="text-gray-500 dark:text-gray-400">
@@ -19,13 +20,20 @@ function DashboardTab({ stock, payments }) {
   }
 
   // Utiliser les tableaux vérifiés pour les calculs
-  const lowStock = stock.filter((item) => item.quantity <= item.min);
-  const totalRevenue = payments
-    .filter((p) => p.type === 'income')
-    .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-  const totalExpenses = payments
-    .filter((p) => p.type === 'expense')
-    .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+  const lowStock = stock.filter(
+    (item) =>
+      typeof item.quantity === 'number' &&
+      typeof item.min === 'number' &&
+      item.quantity <= item.min
+  );
+  const totalRevenue = recettes.reduce(
+    (sum, r) => sum + (parseFloat(r.total) || 0),
+    0
+  );
+  const totalExpenses = depenses.reduce(
+    (sum, d) => sum + (parseFloat(d.total) || 0),
+    0
+  );
   const profit = totalRevenue - totalExpenses;
 
   return (
@@ -62,7 +70,7 @@ function DashboardTab({ stock, payments }) {
                 key={alert.id}
                 className="text-sm text-yellow-700 dark:text-yellow-300"
               >
-                {alert.name}: seulement {alert.quantity} unités restantes
+                {alert.produit_nom}: seulement {alert.quantity} unités restantes
               </li>
             ))
           ) : (
@@ -71,7 +79,7 @@ function DashboardTab({ stock, payments }) {
         </ul>
       </div>
 
-      <ChartSection payments={payments} />
+      <ChartSection recettes={recettes} depenses={depenses} />
     </div>
   );
 }

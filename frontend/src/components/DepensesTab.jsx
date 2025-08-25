@@ -210,7 +210,7 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
           />
           <button
             onClick={openCreateModal}
-            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
             disabled={saving}
           >
             <PlusCircle size={20} />
@@ -227,7 +227,6 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
             <table className="min-w-full bg-white rounded-md overflow-hidden">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">ID</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Date</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Description</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Montant</th>
@@ -237,7 +236,6 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
               <tbody className="divide-y divide-gray-200">
                 {filteredDepenses.map((depense) => (
                   <tr key={depense.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">{depense.id}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{depense.date_depense}</td>
                     <td className="py-4 px-6 text-sm text-gray-600">{depense.description || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">

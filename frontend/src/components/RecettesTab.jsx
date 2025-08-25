@@ -213,7 +213,7 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
           />
           <button
             onClick={openCreateModal}
-            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
             disabled={saving}
           >
             <PlusCircle size={20} />
@@ -230,7 +230,6 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
             <table className="min-w-full bg-white rounded-md overflow-hidden">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">ID</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Produit</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Client</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Contrat</th>
@@ -244,7 +243,6 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
               <tbody className="divide-y divide-gray-200">
                 {filteredRecettes.map((recette) => (
                   <tr key={recette.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">{recette.id}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{produits.find(p => p.id === recette.produit_id)?.name || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{customers.find(c => c.id === recette.customer_id)?.name || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{contrats.find(c => c.id === recette.contrat_id)?.ref || 'N/A'}</td>

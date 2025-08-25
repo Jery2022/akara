@@ -21,7 +21,15 @@ import './App.css'; // Import global styles
 //import './tailwind.css'; // Import Tailwind CSS styles
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // 1. Vérifier le thème sauvegardé dans le localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    // 2. Sinon, utiliser la préférence système
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -32,13 +40,6 @@ export default function App() {
   // URL de l'API backend
   const API_URL = 'http://localhost:8000/backend/api';
 
-  useEffect(() => {
-    // Vérification du mode sombre dans les préférences utilisateur
-    const prefersDark = window.matchMedia(
-      '(prefers-color-scheme: dark)'
-    ).matches;
-    setDarkMode(prefersDark);
-  }, []);
 
   // Vérification de l'authentification persistante
   useEffect(() => {
@@ -55,7 +56,6 @@ export default function App() {
         // Si pas de token, l'utilisateur n'est pas authentifié
         setUser(null);
         setLoading(false); // Désactivez le loading
-        // Ne pas toucher à loadingData ici, il sera géré dans le prochain useEffect
         return;
       }
 
@@ -125,12 +125,14 @@ export default function App() {
   const [factures, setFactures] = useState([]);
   const [quittances, setQuittances] = useState([]);
 
-  // Gestion du mode sombre
+  // Gestion du mode sombre et persistance
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark'); // Sauvegarder le choix
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light'); // Sauvegarder le choix
     }
   }, [darkMode]);
 
@@ -172,7 +174,9 @@ export default function App() {
             },
           });
           if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
-          return await res.json();
+          const jsonResponse = await res.json();
+          // S'assurer que la propriété 'data' existe et est un tableau
+          return Array.isArray(jsonResponse.data) ? jsonResponse.data : [];
         })
       );
 
@@ -190,7 +194,7 @@ export default function App() {
         ventes,
         factures,
         quittances,
-        payments
+        payments,
       ] = responses;
 
       setStockItems(stock);
@@ -394,9 +398,10 @@ export default function App() {
             ) : (
               <>
                 {activeTab === 'dashboard' && (
-                  <DashboardTab 
-                    stock={stockItems} 
-                    payments={payments} 
+                  <DashboardTab
+                    stock={stockItems}
+                    recettes={recettes}
+                    depenses={depenses}
                   />
                 )}
                 {activeTab === 'stock' && (
@@ -430,6 +435,7 @@ export default function App() {
                 {activeTab === 'payments' && (
                   <PaymentsTab
                     payments={payments}
+                    setPayments={setPayments}
                     customers={customers}
                     employees={employees}
                     api={`${API_URL}/payments`}
