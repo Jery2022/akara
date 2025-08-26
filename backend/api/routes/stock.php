@@ -48,7 +48,7 @@ return [
                                 LEFT JOIN produits p ON s.produit_id = p.id
                                 LEFT JOIN suppliers sup ON s.supplier_id = sup.id
                                 LEFT JOIN entrepots e ON s.entrepot_id = e.id
-                                ORDER BY s.id DESC");  
+                                ORDER BY s.id DESC");
             $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
             Response::success('Éléments de stock récupérés avec succès.', $items);
         } catch (PDOException $e) {
@@ -143,22 +143,22 @@ return [
 
         // Validation de quantity (entier non négatif)
         $quantity = filter_var($data['quantity'], FILTER_VALIDATE_INT);
-        if ($quantity === false || $quantity < 0) {  
-            Response::badRequest("Le champ 'quantity' doit être un entier non négatif.");
+        if ($quantity === false || $quantity < 0) {
+            Response::badRequest("Le champ 'quantité' doit être un entier non négatif.");
             return;
         }
 
         // Validation de min (entier non négatif)
         $min = filter_var($data['min'], FILTER_VALIDATE_INT);
         if ($min === false || $min < 0) {
-            Response::badRequest("Le champ 'min' doit être un entier non négatif.");
+            Response::badRequest("Le champ 'minumum' doit être un entier non négatif.");
             return;
         }
 
         // Validation de l'unité (chaîne de caractères, longueur max)
         $unit = trim($data['unit']);
-        if (empty($unit) || strlen($unit) > 50) {  
-            Response::badRequest("Le champ 'unit' est obligatoire et ne doit pas dépasser 50 caractères.");
+        if (empty($unit) || strlen($unit) > 15) {
+            Response::badRequest("Le champ 'unité' est obligatoire et ne doit pas dépasser 15 caractères.");
             return;
         }
 
@@ -167,7 +167,7 @@ return [
         if (isset($data['supplier_id']) && $data['supplier_id'] !== '') {
             $supplier_id = filter_var($data['supplier_id'], FILTER_VALIDATE_INT);
             if ($supplier_id === false || $supplier_id <= 0) {
-                Response::badRequest("Le champ 'supplier_id' doit être un ID valide (entier positif) s'il est fourni.");
+                Response::badRequest("Le champ 'ID fourniseur' doit avoir un ID valide (entier positif) s'il est fourni.");
                 return;
             }
         }
@@ -176,10 +176,19 @@ return [
             $produit_id = $data['produit_id'];
             $entrepot_id = $data['entrepot_id'];
 
+            // Vérifier si le produit existe déjà dans la table stock
+            $checkSql = "SELECT COUNT(*) FROM stock WHERE produit_id = :produit_id";
+            $checkStmt = $pdo->prepare($checkSql);
+            $checkStmt->execute([':produit_id' => $produit_id]);
+            if ($checkStmt->fetchColumn() > 0) {
+                Response::error('Ce produit est déjà enregistré en stock.', 409); // 409 Conflict
+                return;
+            }
+
             $sql = "INSERT INTO stock (produit_id, quantity, unit, min, supplier_id, entrepot_id) 
                     VALUES (:produit_id, :quantity, :unit, :min, :supplier_id, :entrepot_id)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':produit_id'  => $produit_id,
                 ':quantity'    => $quantity,
@@ -189,12 +198,13 @@ return [
                 ':entrepot_id' => $entrepot_id,
             ]);
 
+
+
             if (!$executed) {
                 Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
                 return;
             }
-
-            Response::created('Élément de stock ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::success('Élément de stock ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
         } catch (PDOException $e) {
             error_log('Error creating stock item: ' . $e->getMessage());
             Response::error('Erreur lors de l\'ajout de l\'élément de stock.', 500, ['details' => $e->getMessage()]);
@@ -270,12 +280,12 @@ return [
         if ($min === false || $min < 0) {
             Response::badRequest("Le champ 'min' doit être un entier non négatif.");
             return;
-            }
+        }
 
         // Validation de l'unité (chaîne de caractères, longueur max)
         $unit = trim($data['unit']);
-        if (empty($unit) || strlen($unit) > 50) {  
-            Response::badRequest("Le champ 'unit' est obligatoire et ne doit pas dépasser 50 caractères.");
+        if (empty($unit) || strlen($unit) > 15) {
+            Response::badRequest("Le champ 'unité' est obligatoire et ne doit pas dépasser 15 caractères.");
             return;
         }
 
@@ -296,13 +306,13 @@ return [
             $sql = "UPDATE stock SET 
                         produit_id = :produit_id, 
                         quantity = :quantity, 
-                        unit = :unit, 
+                        unit = :unit,
                         min = :min, 
                         supplier_id = :supplier_id, 
                         entrepot_id = :entrepot_id 
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':produit_id'  => $produit_id,
                 ':quantity'    => $quantity,
@@ -318,10 +328,10 @@ return [
                 return;
             }
             // if ($stmt->rowCount() === 0) {
-                //     Response::notFound('Élément de stock non trouvé avec l\'ID spécifié ou aucune modification effectuée.');
-                //     return;
-                // }
-                
+            //     Response::notFound('Élément de stock non trouvé avec l\'ID spécifié ou aucune modification effectuée.');
+            //     return;
+            // }
+
             // Si rowCount est 0, les données étaient identiques, on renvoie quand même un succès
             Response::success('Élément de stock modifié avec succès.', ['id' => (int) $id]);
         } catch (PDOException $e) {
@@ -355,7 +365,7 @@ return [
         try {
             $sql = "DELETE FROM stock WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

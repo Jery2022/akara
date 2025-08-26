@@ -18,6 +18,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentStockItem, setCurrentStockItem] = useState(null);
+  const [createError, setCreateError] = useState(null);
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -70,7 +71,10 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   );
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null); // Réinitialiser l'erreur lors de l'ouverture
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (item) => {
@@ -82,11 +86,14 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
     setCurrentStockItem(null);
   };
 
+  const clearCreateError = () => setCreateError(null);
+
   // --- Gestion des opérations CRUD ---
 
   // Gère la création d'un nouvel article de stock
   const handleCreateItem = async (newItemData) => {
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/stock`, {
         method: 'POST',
@@ -97,16 +104,23 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
         body: JSON.stringify(newItemData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        // Si le statut est 409, c'est une erreur de conflit (doublon)
+        if (response.status === 409) {
+          setCreateError(result.message); // Afficher le message d'erreur dans la modale
+        } else {
+          throw new Error(result.message || `Erreur HTTP ${response.status}`);
+        }
+      } else {
+        await fetchItems();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Article de stock ajouté avec succès !' });
       }
-      
-      await fetchItems();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Article de stock ajouté avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'article: ${err.message || err.toString()}` });
+      // Pour les autres erreurs, on peut les afficher dans le MessageDisplay global
+      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'article: ${err.message}` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -282,6 +296,9 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
           onClose={closeCreateModal}
           onSave={handleCreateItem}
           loading={saving}
+          errorMessage={createError}
+          existingStockItems={initialItems}
+          onClearBackendError={clearCreateError}
         />
       )}
       
