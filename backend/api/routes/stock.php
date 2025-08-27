@@ -22,85 +22,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer tous les éléments de stock ---
+    // --- Méthode GET : Récupérer un ou plusieurs éléments de stock ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            // Joindre avec les tables 'produits', 'suppliers', et 'entrepots'
-            $stmt = $pdo->query("SELECT s.*, 
-                                        p.name AS produit_nom, 
-                                        sup.name AS supplier_name,
-                                        e.name AS entrepot_nom
-                                FROM stock s 
-                                LEFT JOIN produits p ON s.produit_id = p.id
-                                LEFT JOIN suppliers sup ON s.supplier_id = sup.id
-                                LEFT JOIN entrepots e ON s.entrepot_id = e.id
-                                ORDER BY s.id DESC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Éléments de stock récupérés avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching stock: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des éléments de stock.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer un élément de stock spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
-        if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de stock invalide ou manquant dans l\'URL.');
-            return;
-        }
-
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
 
         try {
-            // Joindre avec les tables 'produits', 'suppliers', et 'entrepots'
-            $stmt = $pdo->prepare("SELECT s.*, 
-                                        p.name AS produit_nom, 
-                                        sup.name AS supplier_name,
-                                        e.name AS entrepot_nom
-                                FROM stock s 
-                                LEFT JOIN produits p ON s.produit_id = p.id
-                                LEFT JOIN suppliers sup ON s.supplier_id = sup.id
-                                LEFT JOIN entrepots e ON s.entrepot_id = e.id
-                                WHERE s.id = :id");
-            $stmt->execute([':id' => $id]);
-            $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                // --- Logique pour récupérer un seul élément (anciennement GET_ID) ---
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de stock invalide ou manquant dans l\'URL.');
+                    return;
+                }
+                $stmt = $pdo->prepare("SELECT s.*, p.name AS produit_nom, sup.name AS supplier_name, e.name AS entrepot_nom FROM stock s LEFT JOIN produits p ON s.produit_id = p.id LEFT JOIN suppliers sup ON s.supplier_id = sup.id LEFT JOIN entrepots e ON s.entrepot_id = e.id WHERE s.id = :id");
+                $stmt->execute([':id' => $id]);
+                $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$stockItem) {
-                Response::notFound('Élément de stock non trouvé.');
-                return;
+                if (!$stockItem) {
+                    Response::notFound('Élément de stock non trouvé.');
+                } else {
+                    Response::success('Élément de stock récupéré avec succès.', $stockItem);
+                }
+            } else {
+                // --- Logique pour récupérer tous les éléments (anciennement GET) ---
+                $stmt = $pdo->query("SELECT s.*, p.name AS produit_nom, sup.name AS supplier_name, e.name AS entrepot_nom FROM stock s LEFT JOIN produits p ON s.produit_id = p.id LEFT JOIN suppliers sup ON s.supplier_id = sup.id LEFT JOIN entrepots e ON s.entrepot_id = e.id ORDER BY s.id DESC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Éléments de stock récupérés avec succès.', $items);
             }
-            Response::success('Élément de stock récupéré avec succès.', $stockItem);
         } catch (PDOException $e) {
-            error_log('Error fetching single stock item: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération de l\'élément de stock.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching stock: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des éléments de stock.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -211,8 +170,8 @@ return [
         }
     },
 
-    // --- Méthode PUT_ID : Modifier un élément de stock spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier un élément de stock spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
             Response::unauthorized(
@@ -340,8 +299,8 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer un élément de stock spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer un élément de stock spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
             Response::unauthorized(

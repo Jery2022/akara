@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import AutocompleteSelect from './AutocompleteSelect';
 import { X } from 'lucide-react';
 
-function CreateStockModal({ onClose, onSave, errorMessage, existingStockItems, onClearBackendError }) {
+function CreateStockModal({ api, onClose, onSave, errorMessage, existingStockItems, onClearBackendError }) {
   const [formData, setFormData] = useState({
     produit_id: '',
     quantity: '',
-    //unit: '',
+    unit: '',
     min: '',
     supplier_id: '',
     entrepot_id: '',
@@ -48,11 +48,11 @@ function CreateStockModal({ onClose, onSave, errorMessage, existingStockItems, o
       }
     };
 
-    fetchData('http://localhost:8000/backend/api/produits', setProduits, 'produits');
-    fetchData('http://localhost:8000/backend/api/suppliers', setSuppliers, 'suppliers');
-    fetchData('http://localhost:8000/backend/api/entrepots', setEntrepots, 'entrepots');
-    // fetchData('http://localhost:8000/backend/api/stock', setStock, 'stock');
-  }, []);
+    fetchData(`${api}/produits`, setProduits, 'produits');
+    fetchData(`${api}/suppliers`, setSuppliers, 'suppliers');
+    fetchData(`${api}/entrepots`, setEntrepots, 'entrepots');
+    // fetchData(`${api}/stock`, setStock, 'stock');
+  }, [api]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

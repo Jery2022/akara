@@ -16,8 +16,8 @@ if not exist %PHP_EXE% (
 
 
 REM --- Confirmez le chemin du dossier public (-t) ---
-REM **CORRECTION MAJEURE ICI : PRÉFIXER AVEC %PROJECT_ROOT%**
-set PUBLIC_DOC_ROOT="%PROJECT_ROOT%backend\src\public"
+REM **CORRECTION MAJEURE ICI : La racine doit être la racine du projet pour que server.php fonctionne**
+set PUBLIC_DOC_ROOT="%PROJECT_ROOT%"
 echo [DEBUG] Le chemin de la racine des documents (-t) est : %PUBLIC_DOC_ROOT%
 if not exist %PUBLIC_DOC_ROOT% (
     echo [ERREUR] Le dossier public n'existe PAS à : %PUBLIC_DOC_ROOT%. VEUILLEZ VÉRIFIER CE CHEMIN.
@@ -36,11 +36,11 @@ if not exist %FALLBACK_SCRIPT% (
 
 echo.
 echo [INFO] Démarrage du serveur PHP sur localhost:8000
-echo [INFO] Racine des documents: %PUBLIC_DOC_ROOT%
-echo [INFO] Script de fallback: %FALLBACK_SCRIPT%
+echo [INFO] Racine des documents: (dossier courant)
+echo [INFO] Script de fallback: server.php
 echo.
 
-php -S localhost:8000 -t %PUBLIC_DOC_ROOT% %FALLBACK_SCRIPT%
+php -S localhost:8000 -t . server.php
 
 echo.
 echo Le serveur PHP a été arrêté.

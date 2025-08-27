@@ -6,8 +6,8 @@ import EditStockModal from './utils/EditStockModal';
 import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 
 // Composant de l'onglet Stock
-function StockManagementTab({ items: initialItems, setItems, api }) {
-  const token = localStorage.getItem('authToken');
+function StockManagementTab({ api }) {
+  const [items, setItems] = useState([]);
 
   // États pour la gestion du chargement et des erreurs
   const [loading, setLoading] = useState(false);
@@ -30,6 +30,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
 
   // Fonction pour charger les articles de stock (Read)
   const fetchItems = useCallback(async () => {
+    const token = localStorage.getItem('authToken');
     setLoading(true);
     setError(null);
     try {
@@ -55,7 +56,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
     } finally {
       setLoading(false);
     }
-  }, [api, token, setItems]);
+  }, [api, setItems]);
 
   // Charger les articles de stock au montage du composant
   useEffect(() => {
@@ -63,7 +64,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   }, [fetchItems]);
 
   // Filtrer les articles pour la recherche
-  const filteredItems = (Array.isArray(initialItems) ? initialItems : []).filter((item) =>
+  const filteredItems = (Array.isArray(items) ? items : []).filter((item) =>
     item.produit_nom?.toLowerCase().includes(search.toLowerCase()) ||
     item.unit?.toLowerCase().includes(search.toLowerCase()) ||
     item.entrepot_nom?.toLowerCase().includes(search.toLowerCase()) ||
@@ -92,6 +93,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
 
   // Gère la création d'un nouvel article de stock
   const handleCreateItem = async (newItemData) => {
+    const token = localStorage.getItem('authToken');
     setSaving(true);
     setCreateError(null);
     try {
@@ -120,7 +122,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
       }
     } catch (err) {
       // Pour les autres erreurs, on peut les afficher dans le MessageDisplay global
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'article: ${err.message}` });
+      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'article.` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -129,15 +131,27 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
 
   // Gère la mise à jour d'un article de stock
   const handleUpdateItem = async (updatedItemData) => {
+    const token = localStorage.getItem('authToken');
     setSaving(true);
     try {
-      const response = await fetch(`${api}/stock/${updatedItemData.id}`, {
+      // Filtrer les données pour ne garder que les champs attendus par le backend
+      const payload = {
+        id: updatedItemData.id,
+        produit_id: updatedItemData.produit_id,
+        quantity: updatedItemData.quantity,
+        unit: updatedItemData.unit,
+        min: updatedItemData.min,
+        supplier_id: updatedItemData.supplier_id,
+        entrepot_id: updatedItemData.entrepot_id,
+      };
+
+      const response = await fetch(`${api}/stock/${payload.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(updatedItemData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -159,6 +173,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   // Gère la suppression d'un article de stock
   const handleDelete = (itemId) => {
     setConfirmAction(() => async () => {
+      const token = localStorage.getItem('authToken');
       setSaving(true);
       try {
         const response = await fetch(`${api}/stock/${itemId}`, {
@@ -293,11 +308,12 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateStockModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateItem}
           loading={saving}
           errorMessage={createError}
-          existingStockItems={initialItems}
+          existingStockItems={items}
           onClearBackendError={clearCreateError}
         />
       )}
@@ -305,9 +321,10 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
       {/* Modale de modification */}
       {isEditModalOpen && currentStockItem && (
         <EditStockModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateItem}
-          stockItemToEdit={currentStockItem}
+          stockItem={currentStockItem}
           loading={saving}
         />
       )}

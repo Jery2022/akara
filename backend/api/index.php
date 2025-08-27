@@ -42,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 // 7. Définir le type de contenu de la réponse pour les requêtes réelles (si votre API renvoie du JSON)
 header("Content-Type: application/json");
 
+// Inclure l'autoloader de Composer pour charger les dépendances (ex: Firebase JWT)
+require_once __DIR__ . '/../../vendor/autoload.php';
+
 // Votre autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
     // Convertit le namespace en chemin de fichier (ex: Core\Response -> Core/Response.php)
@@ -99,6 +102,13 @@ function authenticateRequest(): ?object
 {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 
+    // Fallback pour les serveurs qui ne peuplent pas $_SERVER['HTTP_AUTHORIZATION']
+    if (empty($authHeader) && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        // La casse de l'en-tête peut varier
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
+
     // Débogage : Vérifie la présence et le format du header Authorization
     error_log("[AUTH] Auth Header reçu: " . (empty($authHeader) ? "VIDE" : $authHeader));
 
@@ -148,13 +158,8 @@ function authenticateRequest(): ?object
 
 // --- DÉBUT DU ROUTAGE PRINCIPAL ---
 try {
-    $uri       = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $apiPrefix = '/backend/api';
-
-    // Supprime le préfixe de l'API de l'URI pour obtenir le chemin de la route interne.
-    if (strpos($uri, $apiPrefix) === 0) {
-        $uri = substr($uri, strlen($apiPrefix));
-    }
+    // Lit le chemin de la route directement depuis le paramètre 'path' fourni par .htaccess.
+    $uri = $_GET['path'] ?? '';
 
     // Divise l'URI en segments et nettoie les segments vides.
     $routeSegments = array_values(array_filter(explode('/', trim($uri, '/'))));
@@ -190,15 +195,9 @@ try {
             // sont censées se trouver dans le sous-dossier 'routes/'.
             $filePath = __DIR__ . '/routes/' . $endpoint . '.php';
 
-            // Détermine la méthode à appeler dans le fichier de route.
-            // Si un ID est présent, la méthode peut être suffixée par '_ID' (ex: 'GET_ID').
-            // C'est une convention que vous avez choisie et que vos fichiers de route doivent respecter.
-            $methodToCall = $method;
-            if ($id !== null) {
-                $methodToCall = $method . '_ID';
-            }
-
-            loadRouteFile($filePath, $methodToCall, $params, $currentUser);
+            // La méthode appelée correspond directement à la méthode HTTP (GET, POST, PUT, DELETE).
+            // Le fichier de route lui-même vérifiera la présence d'un ID dans les paramètres.
+            loadRouteFile($filePath, $method, $params, $currentUser);
         }
     } else {
         // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/),
