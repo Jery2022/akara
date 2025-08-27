@@ -40,62 +40,64 @@ function CreateFactureModal ({ onClose, onSave, customers, contrats }) {
     };
 
     return createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full">
-                <h2 className="text-2xl font-bold mb-4 text-gray-800">Créer une Facture</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Montant de la facture */}
-                        <div>
-                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Montant <span className="text-red-500">*</span></label>
-                            <input type="number" id="amount" name="amount" value={formState.amount} onChange={handleChange} required min="0.01" step="0.01" className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm" />
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full h-[500px] flex flex-col overflow-hidden">
+                <h2 className="text-lg font-semibold text-white bg-emerald-600 p-4 shadow-md">Créer une Facture</h2>
+                <div className="flex-grow overflow-y-auto p-6">
+                    <form id="factureForm" onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Montant de la facture */}
+                            <div>
+                                <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Montant <span className="text-red-500">*</span></label>
+                                <input type="number" id="amount" name="amount" value={formState.amount} onChange={handleChange} required min="0.01" step="0.01" className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" />
+                            </div>
+                            {/* Date d'émission */}
+                            <div>
+                                <label htmlFor="date_emission" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date d'émission</label>
+                                <input type="date" id="date_emission" name="date_emission" value={formState.date_emission} onChange={handleChange} className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" />
+                            </div>
+                            {/* Date d'échéance */}
+                            <div>
+                                <label htmlFor="date_echeance" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date d'échéance</label>
+                                <input type="date" id="date_echeance" name="date_echeance" value={formState.date_echeance} onChange={handleChange} className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" />
+                            </div>
+                            {/* Client (select) */}
+                            <div>
+                                <label htmlFor="customer_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Client <span className="text-red-500">*</span></label>
+                                <select id="customer_id" name="customer_id" value={formState.customer_id} onChange={handleChange} required className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                    <option value="">Sélectionnez un client</option>
+                                    {customers.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                                </select>
+                            </div>
+                            {/* Contrat (select) */}
+                            <div>
+                                <label htmlFor="contrat_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Contrat</label>
+                                <select id="contrat_id" name="contrat_id" value={formState.contrat_id || ''} onChange={handleChange} className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                    <option value="">Sélectionnez un contrat</option>
+                                    {contrats.map(c => (<option key={c.id} value={c.id}>{c.ref}</option>))}
+                                </select>
+                            </div>
+                            {/* Statut (select) */}
+                            <div>
+                                <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Statut</label>
+                                <select id="status" name="status" value={formState.status} onChange={handleChange} className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                                    <option value="pending">En attente</option>
+                                    <option value="paid">Payée</option>
+                                    <option value="overdue">En retard</option>
+                                </select>
+                            </div>
                         </div>
-                        {/* Date d'émission */}
+                        {/* Description (textarea) */}
                         <div>
-                            <label htmlFor="date_emission" className="block text-sm font-medium text-gray-700">Date d'émission</label>
-                            <input type="date" id="date_emission" name="date_emission" value={formState.date_emission} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm" />
+                            <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                            <textarea id="description" name="description" value={formState.description} onChange={handleChange} rows="3" className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"></textarea>
                         </div>
-                        {/* Date d'échéance */}
-                        <div>
-                            <label htmlFor="date_echeance" className="block text-sm font-medium text-gray-700">Date d'échéance</label>
-                            <input type="date" id="date_echeance" name="date_echeance" value={formState.date_echeance} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm" />
-                        </div>
-                        {/* Client (select) */}
-                        <div>
-                            <label htmlFor="customer_id" className="block text-sm font-medium text-gray-700">Client <span className="text-red-500">*</span></label>
-                            <select id="customer_id" name="customer_id" value={formState.customer_id} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm">
-                                <option value="">Sélectionnez un client</option>
-                                {customers.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                            </select>
-                        </div>
-                        {/* Contrat (select) */}
-                        <div>
-                            <label htmlFor="contrat_id" className="block text-sm font-medium text-gray-700">Contrat</label>
-                            <select id="contrat_id" name="contrat_id" value={formState.contrat_id || ''} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm">
-                                <option value="">Sélectionnez un contrat</option>
-                                {contrats.map(c => (<option key={c.id} value={c.id}>{c.ref}</option>))}
-                            </select>
-                        </div>
-                        {/* Statut (select) */}
-                        <div>
-                            <label htmlFor="status" className="block text-sm font-medium text-gray-700">Statut</label>
-                            <select id="status" name="status" value={formState.status} onChange={handleChange} className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm">
-                                <option value="pending">En attente</option>
-                                <option value="paid">Payée</option>
-                                <option value="overdue">En retard</option>
-                            </select>
-                        </div>
-                    </div>
-                    {/* Description (textarea) */}
-                    <div>
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
-                        <textarea id="description" name="description" value={formState.description} onChange={handleChange} rows="3" className="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm"></textarea>
-                    </div>
-                    <div className="flex justify-end space-x-2 mt-6">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors">Annuler</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-md">Ajouter</button>
-                    </div>
-                </form>
+                    </form>
+                </div>
+                <div className="flex justify-end space-x-3 p-4 border-t dark:border-gray-700">
+                    <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-700">Annuler</button>
+                    <button type="submit" form="factureForm" className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800">Ajouter</button>
+                </div>
             </div>
         </div>,
         document.body

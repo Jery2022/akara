@@ -1,8 +1,13 @@
-sql/
 vendor/
-Documentations/
-backend/start-docker.*
-backend/start-local.*
 .env
+.env.local
+.env.prod
 .vscode
+.git
+.code-workspace
+dist/
+build/
+*.log
+*.lock  
+.DS_Store
 

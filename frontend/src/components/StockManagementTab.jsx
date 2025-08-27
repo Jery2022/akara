@@ -6,8 +6,8 @@ import EditStockModal from './utils/EditStockModal';
 import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 
 // Composant de l'onglet Stock
-function StockManagementTab({ items: initialItems, setItems, api }) {
-  const token = localStorage.getItem('authToken');
+function StockManagementTab({ api }) {
+  const [items, setItems] = useState([]);
 
   // États pour la gestion du chargement et des erreurs
   const [loading, setLoading] = useState(false);
@@ -18,6 +18,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentStockItem, setCurrentStockItem] = useState(null);
+  const [createError, setCreateError] = useState(null);
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -29,6 +30,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
 
   // Fonction pour charger les articles de stock (Read)
   const fetchItems = useCallback(async () => {
+    const token = localStorage.getItem('authToken');
     setLoading(true);
     setError(null);
     try {
@@ -54,7 +56,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
     } finally {
       setLoading(false);
     }
-  }, [api, token, setItems]);
+  }, [api, setItems]);
 
   // Charger les articles de stock au montage du composant
   useEffect(() => {
@@ -62,7 +64,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   }, [fetchItems]);
 
   // Filtrer les articles pour la recherche
-  const filteredItems = (Array.isArray(initialItems) ? initialItems : []).filter((item) =>
+  const filteredItems = (Array.isArray(items) ? items : []).filter((item) =>
     item.produit_nom?.toLowerCase().includes(search.toLowerCase()) ||
     item.unit?.toLowerCase().includes(search.toLowerCase()) ||
     item.entrepot_nom?.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,7 +72,10 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   );
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null); // Réinitialiser l'erreur lors de l'ouverture
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (item) => {
@@ -82,11 +87,15 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
     setCurrentStockItem(null);
   };
 
+  const clearCreateError = () => setCreateError(null);
+
   // --- Gestion des opérations CRUD ---
 
   // Gère la création d'un nouvel article de stock
   const handleCreateItem = async (newItemData) => {
+    const token = localStorage.getItem('authToken');
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/stock`, {
         method: 'POST',
@@ -97,16 +106,23 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
         body: JSON.stringify(newItemData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        // Si le statut est 409, c'est une erreur de conflit (doublon)
+        if (response.status === 409) {
+          setCreateError(result.message); // Afficher le message d'erreur dans la modale
+        } else {
+          throw new Error(result.message || `Erreur HTTP ${response.status}`);
+        }
+      } else {
+        await fetchItems();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Article de stock ajouté avec succès !' });
       }
-      
-      await fetchItems();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Article de stock ajouté avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'article: ${err.message || err.toString()}` });
+      // Pour les autres erreurs, on peut les afficher dans le MessageDisplay global
+      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'article.` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -115,15 +131,27 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
 
   // Gère la mise à jour d'un article de stock
   const handleUpdateItem = async (updatedItemData) => {
+    const token = localStorage.getItem('authToken');
     setSaving(true);
     try {
-      const response = await fetch(`${api}/stock/${updatedItemData.id}`, {
+      // Filtrer les données pour ne garder que les champs attendus par le backend
+      const payload = {
+        id: updatedItemData.id,
+        produit_id: updatedItemData.produit_id,
+        quantity: updatedItemData.quantity,
+        unit: updatedItemData.unit,
+        min: updatedItemData.min,
+        supplier_id: updatedItemData.supplier_id,
+        entrepot_id: updatedItemData.entrepot_id,
+      };
+
+      const response = await fetch(`${api}/stock/${payload.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(updatedItemData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -145,6 +173,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   // Gère la suppression d'un article de stock
   const handleDelete = (itemId) => {
     setConfirmAction(() => async () => {
+      const token = localStorage.getItem('authToken');
       setSaving(true);
       try {
         const response = await fetch(`${api}/stock/${itemId}`, {
@@ -196,22 +225,22 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
   }
   
   return (
-    <div className="min-h-screen bg-gray-100 p-4 font-sans antialiased">
-      <h2 className="text-2xl font-bold text-emerald-700 flex items-center mb-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4 font-sans antialiased">
+      <h2 className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 flex items-center mb-4">
         Gestion des Stocks
       </h2>
-      <header className="bg-white shadow-md rounded-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+      <header className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
         <div className="w-full md:w-auto flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
           <input
             type="text"
             placeholder="Rechercher un article..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-64 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
           <button
             onClick={openCreateModal}
-            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200"
+            className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
             disabled={saving}
           >
             <PlusCircle size={20} />
@@ -220,41 +249,39 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
         </div>
       </header>
 
-      <div className="bg-white shadow-md rounded-lg p-6">
+      <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
         {filteredItems.length === 0 ? (
-          <p className="text-center text-gray-500">Aucun article de stock trouvé.</p>
+          <p className="text-center text-gray-500 dark:text-gray-400">Aucun article de stock trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full bg-white rounded-md overflow-hidden">
-              <thead className="bg-gray-200">
+            <table className="min-w-full">
+              <thead className="bg-gray-200 dark:bg-gray-700">
                 <tr>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">ID</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Produit</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Quantité</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Unité</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Min</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Fournisseur</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Entrepôt</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 uppercase tracking-wider">Statut</th>
-                  <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Produit</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Quantité</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Unité</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Min</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Fournisseur</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Entrepôt</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Statut</th>
+                  <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">{item.id}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.produit_nom || 'N/A'}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.quantity}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.unit}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.min}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.supplier_name || 'N/A'}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.entrepot_nom || 'N/A'}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600">{item.quantity <= item.min ? (<span className="text-red-600 font-medium">En rupture</span>) : (<span className="text-green-600 font-medium">OK</span>)}</td>
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.produit_nom || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.quantity}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.unit}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.min}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.supplier_name || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.entrepot_nom || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.quantity <= item.min ? (<span className="text-red-600 dark:text-red-400 font-medium">En rupture</span>) : (<span className="text-green-600 dark:text-green-400 font-medium">OK</span>)}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => openEditModal(item)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors duration-150"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors duration-150"
                           aria-label="Modifier l'article"
                           disabled={saving}
                         >
@@ -262,7 +289,7 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
                         </button>
                         <button
                           onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:text-red-900 transition-colors duration-150"
+                          className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 transition-colors duration-150"
                           aria-label="Supprimer l'article"
                           disabled={saving}
                         >
@@ -281,18 +308,23 @@ function StockManagementTab({ items: initialItems, setItems, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateStockModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateItem}
           loading={saving}
+          errorMessage={createError}
+          existingStockItems={items}
+          onClearBackendError={clearCreateError}
         />
       )}
       
       {/* Modale de modification */}
       {isEditModalOpen && currentStockItem && (
         <EditStockModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateItem}
-          stockItemToEdit={currentStockItem}
+          stockItem={currentStockItem}
           loading={saving}
         />
       )}

@@ -64,6 +64,10 @@ if (pathinfo($filePath, PATHINFO_EXTENSION) === 'php' && file_exists($filePath))
 
 // --- Si ce n'était pas un fichier PHP dans public, vérifier les routes API ---
 if (strpos($uri, '/backend/api/') === 0) {
+    // Extraire le chemin de la route pour que index.php puisse le lire.
+    // Exemple: de "/backend/api/auth" on extrait "auth".
+    $_GET['path'] = substr($uri, strlen('/backend/api/'));
+
     require __DIR__ . '/backend/api/index.php';
     exit; // Arrête l'exécution après que l'API ait traité la requête.
 }

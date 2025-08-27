@@ -1,5 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Link, Navigate } from 'react-router-dom';
 import DashboardTab from './components/DashboardTab';
 import StockManagementTab from './components/StockManagementTab';
 import EmployeesTab from './components/EmployeesTab';
@@ -16,13 +17,20 @@ import VentesTab from './components/VentesTab';
 import FacturesTab from './components/FacturesTab';
 import QuittancesTab from './components/QuittancesTab';
 import { MoonIcon, SunIcon } from './components/Icon';
-import { ToastProvider, useToast } from './components/ToastProvider';
+import { useToast } from './components/ToastProvider';
 import './App.css'; // Import global styles
 //import './tailwind.css'; // Import Tailwind CSS styles
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [darkMode, setDarkMode] = useState(() => {
+    // 1. Vérifier le thème sauvegardé dans le localStorage
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    // 2. Sinon, utiliser la préférence système
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -32,13 +40,6 @@ export default function App() {
   // URL de l'API backend
   const API_URL = 'http://localhost:8000/backend/api';
 
-  useEffect(() => {
-    // Vérification du mode sombre dans les préférences utilisateur
-    const prefersDark = window.matchMedia(
-      '(prefers-color-scheme: dark)'
-    ).matches;
-    setDarkMode(prefersDark);
-  }, []);
 
   // Vérification de l'authentification persistante
   useEffect(() => {
@@ -55,7 +56,6 @@ export default function App() {
         // Si pas de token, l'utilisateur n'est pas authentifié
         setUser(null);
         setLoading(false); // Désactivez le loading
-        // Ne pas toucher à loadingData ici, il sera géré dans le prochain useEffect
         return;
       }
 
@@ -125,12 +125,14 @@ export default function App() {
   const [factures, setFactures] = useState([]);
   const [quittances, setQuittances] = useState([]);
 
-  // Gestion du mode sombre
+  // Gestion du mode sombre et persistance
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark'); // Sauvegarder le choix
     } else {
       document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light'); // Sauvegarder le choix
     }
   }, [darkMode]);
 
@@ -172,7 +174,9 @@ export default function App() {
             },
           });
           if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
-          return await res.json();
+          const jsonResponse = await res.json();
+          // S'assurer que la propriété 'data' existe et est un tableau
+          return Array.isArray(jsonResponse.data) ? jsonResponse.data : [];
         })
       );
 
@@ -190,7 +194,7 @@ export default function App() {
         ventes,
         factures,
         quittances,
-        payments
+        payments,
       ] = responses;
 
       setStockItems(stock);
@@ -328,10 +332,9 @@ export default function App() {
   }
 
   return (
-    <ToastProvider >
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 text-gray-800 dark:text-gray-100 transition-colors duration-300">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 text-gray-800 dark:text-gray-100 transition-colors duration-300">
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
           <h1 className="text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400">
             AKARA
           </h1>
@@ -371,17 +374,13 @@ export default function App() {
               { tab: 'factures', label: 'Factures' },
               { tab: 'quittances', label: 'Quittances' },
             ].map(({ tab, label }) => (
-              <button
+              <Link
                 key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`w-full text-left px-4 py-2 rounded-lg ${
-                  activeTab === tab
-                    ? 'bg-emerald-600 text-white'
-                    : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
+                to={`/${tab}`}
+                className={`w-full text-left px-4 py-2 rounded-lg block hover:bg-gray-200 dark:hover:bg-gray-700`}
               >
                 {label}
-              </button>
+              </Link>
             ))}
           </nav>
 
@@ -392,126 +391,27 @@ export default function App() {
                 <p className="text-xl font-semibold">Chargement des données...</p>
               </div>
             ) : (
-              <>
-                {activeTab === 'dashboard' && (
-                  <DashboardTab 
-                    stock={stockItems} 
-                    payments={payments} 
-                  />
-                )}
-                {activeTab === 'stock' && (
-                  <StockManagementTab
-                    items={stockItems}
-                    setItems={setStockItems}
-                    api={`${API_URL}/stock`}
-                  />
-                )}
-                {activeTab === 'employees' && (
-                  <EmployeesTab
-                    employees={employees}
-                    setEmployees={setEmployees}
-                    api={`${API_URL}/employees`}
-                  />
-                )}
-                {activeTab === 'suppliers' && (
-                  <SuppliersTab
-                    suppliers={suppliers}
-                    setSuppliers={setSuppliers}
-                    api={`${API_URL}/suppliers`}
-                  />
-                )}
-                {activeTab === 'customers' && (
-                  <CustomersTab
-                    customers={customers}
-                    setCustomers={setCustomers}
-                    api={`${API_URL}/customers`}
-                  />
-                )}
-                {activeTab === 'payments' && (
-                  <PaymentsTab
-                    payments={payments}
-                    customers={customers}
-                    employees={employees}
-                    api={`${API_URL}/payments`}
-                    refetchPayments={fetchAll}
-                  />
-                )}
-                {activeTab === 'produits' && (
-                  <ProduitsTab
-                    produits={produits}
-                    setProduits={setProduits}
-                    api={`${API_URL}/produits`}
-                    refetchProduits={fetchAll}
-                  />
-                )}
-                {activeTab === 'contrats' && (
-                  <ContratsTab
-                    contrats={contrats}
-                    setContrats={setContrats}
-                    api={`${API_URL}/contrats`}
-                  />
-                )}
-                {activeTab === 'entrepots' && (
-                  <EntrepotsTab
-                    entrepots={entrepots}
-                    setEntrepots={setEntrepots}
-                    api={`${API_URL}/entrepots`}
-                  />
-                )}
-                {activeTab === 'recettes' && (
-                  <RecettesTab
-                    recettes={recettes}
-                    setRecettes={setRecettes}
-                    produits={produits}
-                    setProduits={setProduits}
-                    customers={customers}
-                    setCustomers={setCustomers}
-                    contrats={contrats}
-                    setContrats={setContrats}
-                    api={`${API_URL}`}
-                    refetchRecettes={fetchAll}
-                  />
-                )}
-                {activeTab === 'depenses' && (
-                  <DepensesTab
-                    depenses={depenses}
-                    setDepenses={setDepenses}
-                    api={`${API_URL}/depenses`}
-                  />
-                )}
-                {activeTab === 'achats' && (
-                  <AchatsTab
-                    achats={achats}
-                    setAchats={setAchats}
-                    api={`${API_URL}/achats`}
-                  />
-                )}
-                {activeTab === 'ventes' && (
-                  <VentesTab
-                    ventes={ventes}
-                    setVentes={setVentes}
-                    api={`${API_URL}/ventes`}
-                  />
-                )}
-                {activeTab === 'factures' && (
-                  <FacturesTab
-                    factures={factures}
-                    setFactures={setFactures}
-                    api={`${API_URL}/factures`}
-                  />
-                )}
-                {activeTab === 'quittances' && (
-                  <QuittancesTab
-                    quittances={quittances}
-                    setQuittances={setQuittances}
-                    api={`${API_URL}/quittances`}
-                  />
-                )}
-              </>
+              <Routes>
+                <Route path="/dashboard" element={<DashboardTab stock={stockItems} recettes={recettes} depenses={depenses} />} />
+                <Route path="/stock" element={<StockManagementTab api={API_URL} />} />
+                <Route path="/employees" element={<EmployeesTab employees={employees} setEmployees={setEmployees} api={`${API_URL}/employees`} />} />
+                <Route path="/suppliers" element={<SuppliersTab suppliers={suppliers} setSuppliers={setSuppliers} api={`${API_URL}/suppliers`} />} />
+                <Route path="/customers" element={<CustomersTab customers={customers} setCustomers={setCustomers} api={`${API_URL}/customers`} />} />
+                <Route path="/payments" element={<PaymentsTab payments={payments} setPayments={setPayments} customers={customers} employees={employees} api={`${API_URL}/payments`} refetchPayments={fetchAll} />} />
+                <Route path="/produits" element={<ProduitsTab produits={produits} setProduits={setProduits} api={`${API_URL}/produits`} refetchProduits={fetchAll} />} />
+                <Route path="/contrats" element={<ContratsTab contrats={contrats} setContrats={setContrats} api={`${API_URL}/contrats`} />} />
+                <Route path="/entrepots" element={<EntrepotsTab entrepots={entrepots} setEntrepots={setEntrepots} api={`${API_URL}/entrepots`} />} />
+                <Route path="/recettes" element={<RecettesTab recettes={recettes} setRecettes={setRecettes} produits={produits} setProduits={setProduits} customers={customers} setCustomers={setCustomers} contrats={contrats} setContrats={setContrats} api={`${API_URL}`} refetchRecettes={fetchAll} />} />
+                <Route path="/depenses" element={<DepensesTab depenses={depenses} setDepenses={setDepenses} api={`${API_URL}/depenses`} />} />
+                <Route path="/achats" element={<AchatsTab achats={achats} setAchats={setAchats} api={`${API_URL}/achats`} />} />
+                <Route path="/ventes" element={<VentesTab ventes={ventes} setVentes={setVentes} api={`${API_URL}/ventes`} />} />
+                <Route path="/factures" element={<FacturesTab factures={factures} setFactures={setFactures} api={`${API_URL}/factures`} />} />
+                <Route path="/quittances" element={<QuittancesTab quittances={quittances} setQuittances={setQuittances} api={`${API_URL}/quittances`} />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
             )}
           </main>
         </div>
       </div>
-    </ToastProvider>
   );
 }
