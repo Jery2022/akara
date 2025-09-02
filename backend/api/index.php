@@ -11,7 +11,7 @@ error_reporting(E_ALL);
 header("Content-Type: application/json");
 
 // Inclure l'autoloader de Composer pour charger les dépendances (ex: Firebase JWT)
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../src/vendor/autoload.php';
 
 // Votre autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
@@ -25,7 +25,7 @@ spl_autoload_register(function ($className) {
 
 // Inclure explicitement Response au cas où l'autoloader ne la trouverait pas immédiatement.
 // C'est redondant avec l'autoload si bien configuré, mais ne fait pas de mal.
-require_once __DIR__ . '/Core/Response.php';
+require_once __DIR__ . '/core/Response.php';
 
 // Utilisation des classes nécessaires avec les namespaces
 use Core\Response;

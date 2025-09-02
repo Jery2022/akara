@@ -129,14 +129,13 @@ function getDetailsFactures($id)
             return [];
         }
     }
-
 }
 
 function getDatasTableByID($table, $id)
 {
     $pdo = getPDO();
 
-                                                                                                                                                                       // Validation du nom de la table contre une liste blanche
+    // Validation du nom de la table contre une liste blanche
     $validTables = ['details_facture', 'achats', 'contrats', 'customers', 'suppliers', 'entrepots', 'factures', 'payments', 'produits', 'recettes', 'stock', 'users']; // Ajoutez d'autres noms de tables valides si nécessaire
     if (! in_array($table, $validTables) || ! is_numeric($id) || empty($id)) {
         return ['error' => 'Nom de table ou ID invalide.'];
@@ -160,7 +159,7 @@ function getDatasTableByID($table, $id)
  */
 function convertToLocalNumber($stringNumber)
 {
-                                                            // Remplacer les virgules par des points pour le séparateur décimal
+    // Remplacer les virgules par des points pour le séparateur décimal
     $stringNumber1 = str_replace(',', '', $stringNumber);   // Supprime les virgules
     $stringNumber  = str_replace('.', ',', $stringNumber1); // Remplace le point par une virgule
 
