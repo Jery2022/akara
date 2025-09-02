@@ -21,57 +21,64 @@ if (file_exists(__DIR__ . '/' . $dotenvFilename)) {
 }
 
 // --- 3. Gérer les requêtes entrantes ---
-$uri           = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$requestMethod = $_SERVER['REQUEST_METHOD']; // Obtenir la méthode HTTP (GET, POST, etc.)
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$requestMethod = $_SERVER['REQUEST_METHOD'];
 
-// --- Définir le chemin absolu du dossier public ---
-$publicPath = __DIR__ . '/backend/src/public';
-
-// --- Vérifier si la requête est pour un fichier PHP dans le dossier public ---
-// Cette partie est la NOUVELLE logique pour gérer les routes de l'application d'administration.
-// Elle s'exécute SI le serveur intégré n'a PAS servi le fichier directement (ce qui semble être le cas).
-$filePath = $publicPath . $uri; // Construit le chemin complet du fichier demandé
-
-// Si l'URI est pour la racine (/), on pourrait vouloir rediriger vers index.php de l'admin
-if ($uri === '/') {
-    $filePath = $publicPath . '/index.php';
-}
-
-// --- Servir les fichiers statiques (images, CSS, JS, etc.) ---
-$staticFile = $publicPath . $uri;
-
-if (file_exists($staticFile) && ! is_dir($staticFile)) {
-    $extension = pathinfo($staticFile, PATHINFO_EXTENSION);
-
-    if ($extension !== 'php') {
-        $mimeType = mime_content_type($staticFile);
-        header("Content-Type: $mimeType");
-        readfile($staticFile);
-        exit;
-    }
-}
-
-// Assurez-vous que le fichier est un fichier PHP (pas de .htaccess, .css, etc. qui devraient être servis statiquement)
-// Et qu'il existe réellement.
-if (pathinfo($filePath, PATHINFO_EXTENSION) === 'php' && file_exists($filePath)) {
-    $_SERVER['SCRIPT_FILENAME'] = $filePath;
-    $_SERVER['SCRIPT_NAME']     = $uri; // Rend l'URI originale disponible comme nom de script
-    // Note: $_SERVER['PHP_SELF'] peut être problématique, utilisez SCRIPT_NAME ou REQUEST_URI
-
-    require $filePath;
-    exit; // Arrête l'exécution après avoir servi le fichier PHP d'administration
-}
-
-// --- Si ce n'était pas un fichier PHP dans public, vérifier les routes API ---
+// --- Routeur pour l'API ---
 if (strpos($uri, '/backend/api/') === 0) {
-    // Extraire le chemin de la route pour que index.php puisse le lire.
-    // Exemple: de "/backend/api/auth" on extrait "auth".
-    $_GET['path'] = substr($uri, strlen('/backend/api/'));
+    // Définition des en-têtes CORS pour l'API
+    header("Access-Control-Allow-Origin: http://localhost:3000");
+    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+    header("Access-Control-Allow-Credentials: true");
+    header("Access-Control-Max-Age: 86400");
 
+    if ($requestMethod == 'OPTIONS') {
+        http_response_code(200);
+        exit();
+    }
+
+    $apiPath = substr($uri, strlen('/backend/api/'));
+    // Ne pas utiliser $_GET car il n'est pas fiable pour les requêtes PUT/DELETE avec le serveur intégré.
+    // On passe plutôt une variable locale au script inclus.
+    $path = $apiPath;
+
+    error_log("[SERVER] Requête API détectée. URI: {$uri}, Path: {$path}");
     require __DIR__ . '/backend/api/index.php';
-    exit; // Arrête l'exécution après que l'API ait traité la requête.
+    exit;
 }
 
-// --- Si la requête ne correspond à aucune route connue (fichier PHP ou API), renvoie une 404. ---
-http_response_code(404);
-echo "Page non trouvée.";
+// --- Servir l'application Frontend (React) ---
+$frontendPath = __DIR__ . '/frontend/public';
+$filePath = $frontendPath . $uri;
+
+// Si la requête est pour un fichier statique existant (css, js, image, etc.)
+if (file_exists($filePath) && !is_dir($filePath)) {
+    $extension = pathinfo($filePath, PATHINFO_EXTENSION);
+    $mimeTypes = [
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'svg' => 'image/svg+xml',
+        'ico' => 'image/x-icon',
+        'json' => 'application/json',
+        'html' => 'text/html',
+    ];
+
+    $mimeType = $mimeTypes[$extension] ?? mime_content_type($filePath);
+    header("Content-Type: {$mimeType}");
+    readfile($filePath);
+    exit;
+}
+
+// Pour toutes les autres requêtes, servir le index.html de React (gestion du routage côté client)
+$indexPath = $frontendPath . '/index.html';
+if (file_exists($indexPath)) {
+    readfile($indexPath);
+} else {
+    http_response_code(404);
+    echo "Application non trouvée. Le fichier index.html est manquant.";
+}

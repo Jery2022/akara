@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../bootstrap.php'; // Inclure le fichier bootstrap pour charger les variables d'environnement
 session_start();
 
 $role = $_SESSION['role'] ?? '';

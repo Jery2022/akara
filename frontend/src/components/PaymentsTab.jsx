@@ -19,6 +19,8 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentPayment, setCurrentPayment] = useState(null);
+  const [createError, setCreateError] = useState(null);
+  const [editError, setEditError] = useState(null);
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -27,6 +29,7 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('date_payment_desc');
 
   // Fonction pour charger les paiements (Read)
   const fetchPayments = useCallback(async () => {
@@ -62,31 +65,47 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
     fetchPayments();
   }, [fetchPayments]);
 
-  // Fonction d'aide pour trouver un client par son ID
-  const getCustomerName = (customerId) => {
-    const customer = (customers || []).find(c => c.id === customerId);
-    return customer ? `${customer.name}` : 'Inconnu';
-  };
+  // Filtrer et trier les paiements
+  const sortedAndFilteredPayments = (Array.isArray(initialPayments) ? initialPayments : [])
+    .filter((payment) =>
+      payment.description?.toLowerCase().includes(search.toLowerCase()) ||
+      payment.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+      payment.employee_name?.toLowerCase().includes(search.toLowerCase()) ||
+      payment.type?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
 
-  // Fonction d'aide pour trouver un employé par son ID
-  const getEmployeeName = (userId) => {
-    const employee = (employees || []).find(e => e.id === userId);
-    return employee ? `${employee.name}` : 'Inconnu';
-  };
+      const valA = a[key];
+      const valB = b[key];
 
-  // Filtrer les paiements pour la recherche
-  const filteredPayments = (Array.isArray(initialPayments) ? initialPayments : []).filter((payment) =>
-    payment.description?.toLowerCase().includes(search.toLowerCase()) ||
-    getCustomerName(payment.customer_id)?.toLowerCase().includes(search.toLowerCase()) ||
-    getEmployeeName(payment.user_id)?.toLowerCase().includes(search.toLowerCase()) ||
-    payment.type?.toLowerCase().includes(search.toLowerCase())
-  );
+      if (valA == null || valB == null) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      } else if (key === 'date_payment') {
+        comparison = new Date(valA) - new Date(valB);
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null);
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (payment) => {
+    setEditError(null);
     setCurrentPayment(payment);
     setIsEditModalOpen(true);
   };
@@ -100,6 +119,7 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
   // Gère la création d'un nouveau paiement
   const handleCreatePayment = async (newPaymentData) => {
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/payments`, {
         method: 'POST',
@@ -110,16 +130,17 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
         body: JSON.stringify(newPaymentData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        setCreateError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchPayments();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Paiement ajouté avec succès !' });
       }
-      
-      await fetchPayments();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Paiement ajouté avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout du paiement: ${err.message || err.toString()}` });
+      setCreateError(`Erreur lors de l'ajout du paiement: ${err.message || err.toString()}`);
       console.error(err);
     } finally {
       setSaving(false);
@@ -129,6 +150,7 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
   // Gère la mise à jour d'un paiement
   const handleUpdatePayment = async (updatedPaymentData) => {
     setSaving(true);
+    setEditError(null);
     try {
       const response = await fetch(`${api}/payments/${updatedPaymentData.id}`, {
         method: 'PUT',
@@ -139,16 +161,17 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
         body: JSON.stringify(updatedPaymentData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la mise à jour: ${errorBody.message || response.statusText}`);
+        setEditError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchPayments();
+        closeEditModal();
+        setMessage({ type: 'success', text: 'Paiement mis à jour avec succès !' });
       }
-      
-      await fetchPayments();
-      closeEditModal();
-      setMessage({ type: 'success', text: 'Paiement mis à jour avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de la mise à jour du paiement: ${err.message || err.toString()}` });
+      setEditError(`Erreur lors de la mise à jour du paiement: ${err.message || err.toString()}`);
       console.error(err);
     } finally {
       setSaving(false);
@@ -222,6 +245,18 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="date_payment_desc">Date (Plus récent)</option>
+            <option value="date_payment_asc">Date (Plus ancien)</option>
+            <option value="amount_desc">Montant (Décroissant)</option>
+            <option value="amount_asc">Montant (Croissant)</option>
+            <option value="customer_name_asc">Client (A-Z)</option>
+            <option value="customer_name_desc">Client (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -234,7 +269,7 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredPayments.length === 0 ? (
+        {sortedAndFilteredPayments.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucun paiement trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -250,10 +285,10 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredPayments.map((payment) => (
+                {sortedAndFilteredPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                      {getCustomerName(payment.customer_id)}
+                      {payment.customer_name || 'Inconnu'}
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                       {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF' }).format(payment.amount)}
@@ -263,7 +298,7 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
                       {formatDate(payment.date_payment)}
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                      {getEmployeeName(payment.user_id)}
+                      {payment.employee_name || 'N/A'}
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
@@ -296,23 +331,25 @@ function PaymentsTab({ payments: initialPayments, setPayments, customers, employ
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreatePaymentModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreatePayment}
-          customers={customers}
-          employees={employees}
           loading={saving}
+          errorMessage={createError}
+          onClearBackendError={() => setCreateError(null)}
         />
       )}
       
       {/* Modale de modification */}
       {isEditModalOpen && currentPayment && (
         <EditPaymentModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdatePayment}
           paymentToEdit={currentPayment}
-          customers={customers}
-          employees={employees}
           loading={saving}
+          errorMessage={editError}
+          onClearBackendError={() => setEditError(null)}
         />
       )}
 

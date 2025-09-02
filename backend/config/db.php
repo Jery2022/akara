@@ -2,27 +2,9 @@
 // backend/config/db.php
 
 /**
- * Fonction utilitaire pour récupérer une variable d'environnement chargée.
- *
- * Cette fonction vérifie d'abord getenv() (variables d'environnement système ou putenv),
- * puis $_ENV (variables chargées par phpdotenv dans le script PHP).
- *
- * @param string $key La clé de la variable d'environnement à récupérer.
- * @param mixed $default La valeur par défaut à retourner si la clé n'est pas trouvée.
- * @return mixed La valeur de la variable d'environnement ou la valeur par défaut.
- */
-function env(string $key, mixed $default = null): mixed
-{
-    // Priorise getenv() car il est souvent utilisé pour les variables système.
-    // phpdotenv met les variables à la fois dans $_ENV et getenv().
-    $value = getenv($key);
-    return $value !== false ? $value : ($_ENV[$key] ?? $default);
-}
-
-/**
  * Retourne une instance PDO connectée à la base de données.
  *
- * Cette fonction utilise les variables d'environnement (chargées par server.php)
+ * Cette fonction utilise les variables d'environnement (chargées par bootstrap.php)
  * pour établir la connexion à la base de données. Elle gère également les erreurs
  * de connexion et assure une configuration PDO robuste.
  *
@@ -31,6 +13,7 @@ function env(string $key, mixed $default = null): mixed
  */
 function getPDO(): PDO
 {
+    // Utilise la fonction env() définie dans bootstrap.php
     $dbHost    = env('DB_HOST');
     $dbName    = env('DB_NAME');
     $dbUser    = env('DB_USER');

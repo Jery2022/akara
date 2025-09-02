@@ -19,6 +19,8 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentAchat, setCurrentAchat] = useState(null);
+  const [createError, setCreateError] = useState(null);
+  const [editError, setEditError] = useState(null);
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -27,6 +29,8 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('date_achat_desc');
+
 
   // Fonction pour charger les achats (Read)
   const fetchAchats = useCallback(async () => {
@@ -62,17 +66,47 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
     fetchAchats();
   }, [fetchAchats]);
 
-  // Filtrer les achats pour la recherche
-  const filteredAchats = (Array.isArray(initialAchats) ? initialAchats : []).filter((achat) =>
-    achat.description?.toLowerCase().includes(search.toLowerCase()) ||
-    achat.amount?.toString().includes(search)
-  );
+  // Filtrer et trier les achats
+  const sortedAndFilteredAchats = (Array.isArray(initialAchats) ? initialAchats : [])
+    .filter((achat) =>
+      achat.name?.toLowerCase().includes(search.toLowerCase()) ||
+      achat.description?.toLowerCase().includes(search.toLowerCase()) ||
+      achat.amount?.toString().includes(search) ||
+      achat.date_achat?.toString().toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+      
+      const valA = a[key];
+      const valB = b[key];
+
+      if (valA == null || valB == null) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (key === 'date_achat') {
+        comparison = new Date(b[key]) - new Date(a[key]); // Pour les dates, plus récent en premier
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null);
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (achat) => {
+    setEditError(null);
     setCurrentAchat(achat);
     setIsEditModalOpen(true);
   };
@@ -86,6 +120,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
   // Gère la création d'un nouvel achat
   const handleCreateAchat = async (newAchatData) => {
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/achats`, {
         method: 'POST',
@@ -96,16 +131,17 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
         body: JSON.stringify(newAchatData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        setCreateError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchAchats();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Achat ajouté avec succès !' });
       }
-      
-      await fetchAchats();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Achat ajouté avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout de l'achat: ${err.message || err.toString()}` });
+      setCreateError(`Erreur lors de l'ajout de l'achat: ${err.message || err.toString()}`);
       console.error(err);
     } finally {
       setSaving(false);
@@ -115,6 +151,7 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
   // Gère la mise à jour d'un achat
   const handleUpdateAchat = async (updatedAchatData) => {
     setSaving(true);
+    setEditError(null);
     try {
       const response = await fetch(`${api}/achats/${updatedAchatData.id}`, {
         method: 'PUT',
@@ -125,16 +162,17 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
         body: JSON.stringify(updatedAchatData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la mise à jour: ${errorBody.message || response.statusText}`);
+        setEditError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchAchats();
+        closeEditModal();
+        setMessage({ type: 'success', text: 'Achat mis à jour avec succès !' });
       }
-      
-      await fetchAchats();
-      closeEditModal();
-      setMessage({ type: 'success', text: 'Achat mis à jour avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de la mise à jour de l'achat: ${err.message || err.toString()}` });
+      setEditError(`Erreur lors de la mise à jour de l'achat: ${err.message || err.toString()}`);
       console.error(err);
     } finally {
       setSaving(false);
@@ -208,6 +246,22 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="date_achat_desc">Date (Plus récent)</option>
+            <option value="date_achat_asc">Date (Plus ancien)</option>
+            <option value="amount_desc">Montant (Décroissant)</option>
+            <option value="amount_asc">Montant (Croissant)</option>
+            <option value="description_asc">Description (A-Z)</option>
+            <option value="description_desc">Description (Z-A)</option>
+            <option value="status_asc">Statut (A-Z)</option>
+            <option value="status_desc">Statut (Z-A)</option>
+            <option value="name_asc">Nom (A-Z)</option>
+            <option value="name_desc">Nom (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto  bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -220,27 +274,39 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredAchats.length === 0 ? (
+        {sortedAndFilteredAchats.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucun achat trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-200 dark:bg-gray-700">
                 <tr>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Nom</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Description</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Montant</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Date d'achat</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Statut</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredAchats.map((achat) => (
+                {sortedAndFilteredAchats.map((achat) => (
                   <tr key={achat.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{achat.name}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{achat.description}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                       {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(achat.amount)}
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{achat.date_achat}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        achat.status === 'réglé' ? 'bg-green-100 text-green-800' :
+                        achat.status === 'en attente' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {achat.status}
+                      </span>
+                    </td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
@@ -272,19 +338,25 @@ function AchatsTab({ achats: initialAchats, setAchats, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateAchatModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateAchat}
           loading={saving}
+          errorMessage={createError}
+          onClearBackendError={() => setCreateError(null)}
         />
       )}
       
       {/* Modale de modification */}
       {isEditModalOpen && currentAchat && (
         <EditAchatModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateAchat}
           achatToEdit={currentAchat}
           loading={saving}
+          errorMessage={editError}
+          onClearBackendError={() => setEditError(null)}
         />
       )}
 

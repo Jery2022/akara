@@ -19,6 +19,9 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentFacture, setCurrentFacture] = useState(null);
+  const [createError, setCreateError] = useState(null);
+  const [editError, setEditError] = useState(null);
+
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -27,6 +30,8 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('date_facture_desc');
+
 
   // Fonction pour charger les factures (Read)
   const fetchFactures = useCallback(async () => {
@@ -62,17 +67,44 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
     fetchFactures();
   }, [fetchFactures]);
 
-  // Filtrer les factures pour la recherche
-  const filteredFactures = (Array.isArray(initialFactures) ? initialFactures : []).filter((facture) =>
-    facture.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-    facture.amount_ttc?.toString().includes(search)
-  );
+  // Filtrer et trier les factures
+  const sortedAndFilteredFactures = (Array.isArray(initialFactures) ? initialFactures : [])
+    .filter((facture) =>
+      facture.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+      facture.amount_ttc?.toString().includes(search) ||
+      facture.status?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+
+      const valA = a[key];
+      const valB = b[key];
+
+      if (valA == null || valB == null) return 0;
+
+      let comparison = 0;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      } else {
+        comparison = String(valA).localeCompare(String(valB));
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null);
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (facture) => {
+    setEditError(null);
     setCurrentFacture(facture);
     setIsEditModalOpen(true);
   };
@@ -86,6 +118,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
   // Gère la création d'une nouvelle facture
   const handleCreateFacture = async (newFactureData) => {
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/factures`, {
         method: 'POST',
@@ -96,16 +129,17 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
         body: JSON.stringify(newFactureData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        setCreateError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchFactures();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Facture ajoutée avec succès !' });
       }
-      
-      await fetchFactures();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Facture ajoutée avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout de la facture: ${err.message || err.toString()}` });
+      setMessage({ type: 'error', text: `Erreur lors de l'ajout de la facture.` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -115,6 +149,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
   // Gère la mise à jour d'une facture
   const handleUpdateFacture = async (updatedFactureData) => {
     setSaving(true);
+    setEditError(null);
     try {
       const response = await fetch(`${api}/factures/${updatedFactureData.id}`, {
         method: 'PUT',
@@ -125,16 +160,17 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
         body: JSON.stringify(updatedFactureData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la mise à jour: ${errorBody.message || response.statusText}`);
+        setEditError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchFactures();
+        closeEditModal();
+        setMessage({ type: 'success', text: 'Facture mise à jour avec succès !' });
       }
-      
-      await fetchFactures();
-      closeEditModal();
-      setMessage({ type: 'success', text: 'Facture mise à jour avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de la mise à jour de la facture: ${err.message || err.toString()}` });
+      setMessage({ type: 'error', text: `Erreur lors de la mise à jour de la facture.` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -208,6 +244,18 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="date_facture_desc">Plus récentes d'abord</option>
+            <option value="date_facture_asc">Plus anciennes d'abord</option>
+            <option value="amount_ttc_desc">Montant (Décroissant)</option>
+            <option value="amount_ttc_asc">Montant (Croissant)</option>
+            <option value="customer_name_asc">Client (A-Z)</option>
+            <option value="customer_name_desc">Client (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -220,7 +268,7 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredFactures.length === 0 ? (
+        {sortedAndFilteredFactures.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucune facture trouvée.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -228,19 +276,37 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
               <thead className="bg-gray-200 dark:bg-gray-700">
                 <tr>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Client</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Date</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Montant TTC</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Date de facture</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Statut</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Avance</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredFactures.map((facture) => (
+                {sortedAndFilteredFactures.map((facture) => (
                   <tr key={facture.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{facture.customer_name}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">{facture.customer_id}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{new Date(facture.date_facture).toLocaleDateString()}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                       {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(facture.amount_ttc)}
                     </td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{facture.date_facture}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        facture.status === 'payée' ? 'bg-green-100 text-green-800' :
+                        facture.status === 'en attente' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {facture.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        facture.avance_status === 'oui' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {facture.avance_status}
+                      </span>
+                    </td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
@@ -272,19 +338,25 @@ function FacturesTab({ factures: initialFactures, setFactures, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateFactureModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateFacture}
           loading={saving}
+          errorMessage={createError}
+          onClearBackendError={() => setCreateError(null)}
         />
       )}
       
       {/* Modale de modification */}
       {isEditModalOpen && currentFacture && (
         <EditFactureModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateFacture}
           factureToEdit={currentFacture}
           loading={saving}
+          errorMessage={editError}
+          onClearBackendError={() => setEditError(null)}
         />
       )}
 

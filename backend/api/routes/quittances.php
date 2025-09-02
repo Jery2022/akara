@@ -23,75 +23,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer toutes les quittances ---
+    // --- Méthode GET : Récupérer une ou plusieurs quittances ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            // Joindre avec la table 'employees' pour obtenir le nom de l'employé
-            $stmt = $pdo->query("SELECT q.*, e.name AS employee_name 
-                                FROM quittances q 
-                                LEFT JOIN employees e ON q.employee_id = e.id
-                                ORDER BY q.date_emission DESC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Quittances récupérées avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching quittances: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des quittances.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer une quittance spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
-        if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de quittance invalide ou manquant dans l\'URL.');
-            return;
-        }
-
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
+        $baseQuery = "SELECT q.*, e.name AS employee_name 
+                      FROM quittances q 
+                      LEFT JOIN employees e ON q.employee_id = e.id
+                      WHERE q.is_active = 1";
 
         try {
-            // Joindre avec la table 'employees' pour obtenir le nom de l'employé
-            $stmt = $pdo->prepare("SELECT q.*, e.name AS employee_name 
-                                   FROM quittances q 
-                                   LEFT JOIN employees e ON q.employee_id = e.id
-                                   WHERE q.id = :id");
-            $stmt->execute([':id' => $id]);
-            $quittance = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de quittance invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("$baseQuery AND q.id = :id");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$quittance) {
-                Response::notFound('Quittance non trouvée.');
-                return;
+                if (!$item) {
+                    Response::notFound('Quittance non trouvée.');
+                } else {
+                    Response::success('Quittance récupérée avec succès.', $item);
+                }
+            } else {
+                $stmt = $pdo->query("$baseQuery ORDER BY q.date_emission DESC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Quittances récupérées avec succès.', $items);
             }
-            Response::success('Quittance récupérée avec succès.', $quittance);
         } catch (PDOException $e) {
-            error_log('Error fetching single quittance: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération de la quittance.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching quittances: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des quittances.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -143,7 +114,7 @@ return [
                 return;
             }
         }
-        
+
         $periode_service = trim($data['periode_service']);
         if (empty($periode_service)) {
             Response::badRequest("Le champ 'periode_service' ne peut pas être vide.");
@@ -160,7 +131,7 @@ return [
             $sql = "INSERT INTO quittances (employee_id, date_paiement, montant, periode_service, numero_quittance, date_emission, type) 
                     VALUES (:employee_id, :date_paiement, :montant, :periode_service, :numero_quittance, :date_emission, :type)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':employee_id'     => $employee_id,
                 ':date_paiement'   => $date_paiement,
@@ -176,21 +147,18 @@ return [
                 return;
             }
 
-            Response::created('Quittance créée avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Quittance créée avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating quittance: ' . $e->getMessage());
             Response::error('Erreur lors de la création de la quittance.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- Méthode PUT_ID : Modifier une quittance spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier une quittance spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
         }
 
@@ -237,7 +205,7 @@ return [
                 return;
             }
         }
-        
+
         // Validation de periode_service
         $periode_service = trim($data['periode_service']);
         if (empty($periode_service)) {
@@ -262,7 +230,7 @@ return [
                         type = :type 
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':employee_id'     => $employee_id,
                 ':date_paiement'   => $date_paiement,
@@ -291,14 +259,11 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer une quittance spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer une quittance spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour supprimer une ressource.');
             return;
         }
 
@@ -314,9 +279,9 @@ return [
         }
 
         try {
-            $sql = "DELETE FROM quittances WHERE id = :id";
+            $sql = "UPDATE quittances SET is_active = 0 WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

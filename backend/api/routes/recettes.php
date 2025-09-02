@@ -22,59 +22,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer toutes les recettes ---
+    // --- Méthode GET : Récupérer une ou plusieurs recettes ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            $stmt = $pdo->query("SELECT * FROM recettes ORDER BY date_recette DESC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Recettes récupérées avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching recettes: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des recettes.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer une recette spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        if (!$currentUser) {
-            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de recette invalide ou manquant.');
-            return;
-        }
-
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
 
         try {
-            $stmt = $pdo->prepare("SELECT * FROM recettes WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $recette = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de recette invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("SELECT * FROM recettes WHERE id = :id AND is_active = 1");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$recette) {
-                Response::notFound('Recette non trouvée.');
-                return;
+                if (!$item) {
+                    Response::notFound('Recette non trouvée.');
+                } else {
+                    Response::success('Recette récupérée avec succès.', $item);
+                }
+            } else {
+                $stmt = $pdo->query("SELECT * FROM recettes WHERE is_active = 1 ORDER BY date_recette DESC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Recettes récupérées avec succès.', $items);
             }
-            Response::success('Recette récupérée avec succès.', $recette);
         } catch (PDOException $e) {
-            error_log('Error fetching single recette: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération de la recette.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching recettes: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des recettes.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -93,14 +76,14 @@ return [
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Champs obligatoires (note: 'contrat_id' n'est pas obligatoire)
-        $requiredFields = ['produit_id', 'customer_id', 'quantity', 'price', 'total', 'date_recette', 'nature', 'category'];
+        $requiredFields = ['name', 'produit_id', 'customer_id', 'quantity', 'price', 'total', 'date_recette', 'nature', 'category'];
         foreach ($requiredFields as $field) {
             if (!isset($data[$field]) || $data[$field] === '') {
                 Response::badRequest("Le champ '{$field}' est obligatoire.");
                 return;
             }
         }
-        
+
         // Validation des données
         if (!is_numeric($data['quantity']) || $data['quantity'] <= 0) {
             Response::badRequest("Le champ 'quantity' doit être un nombre positif.");
@@ -122,7 +105,7 @@ return [
             Response::badRequest("Le champ 'customer_id' doit être un nombre positif.");
             return;
         }
-        
+
         // Validation ajustée pour permettre à 'contrat_id' d'être vide
         if (isset($data['contrat_id']) && !empty($data['contrat_id']) && (!is_numeric($data['contrat_id']) || $data['contrat_id'] <= 0)) {
             Response::badRequest("Le champ 'contrat_id' doit être un nombre positif s'il est fourni.");
@@ -133,11 +116,12 @@ return [
             // Définir contrat_id à NULL si la valeur est vide ou non fournie
             $contratId = !empty($data['contrat_id']) ? (int) $data['contrat_id'] : null;
 
-            $sql = "INSERT INTO recettes (produit_id, customer_id, contrat_id, quantity, price, total, date_recette, description, nature, category) 
-                    VALUES (:produit_id, :customer_id, :contrat_id, :quantity, :price, :total, :date_recette, :description, :nature, :category)";
+            $sql = "INSERT INTO recettes (name, produit_id, customer_id, contrat_id, quantity, price, total, date_recette, description, nature, category) 
+                    VALUES (:name, :produit_id, :customer_id, :contrat_id, :quantity, :price, :total, :date_recette, :description, :nature, :category)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
+                ':name'             => $data['name'],
                 ':produit_id'       => $data['produit_id'],
                 ':customer_id'      => $data['customer_id'],
                 ':contrat_id'       => $contratId, // Utilisation de la variable ajustée
@@ -155,16 +139,15 @@ return [
                 return;
             }
 
-            // Utiliser Response::success pour retourner l'ID
-            Response::success('Recette ajoutée avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Recette ajoutée avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating recette: ' . $e->getMessage());
             Response::error('Erreur lors de la création de la recette.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-  // --- Méthode PUT_ID : Modifier une recette spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier une recette spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
@@ -198,7 +181,7 @@ return [
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Champs obligatoires pour la mise à jour
-        $requiredFields = ['produit_id', 'customer_id', 'quantity', 'price', 'total', 'date_recette', 'nature', 'category'];
+        $requiredFields = ['name', 'produit_id', 'customer_id', 'quantity', 'price', 'total', 'date_recette', 'nature', 'category'];
         foreach ($requiredFields as $field) {
             if (!isset($data[$field]) || $data[$field] === '') {
                 Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
@@ -227,7 +210,7 @@ return [
             Response::badRequest("Le champ 'customer_id' doit être un nombre positif.");
             return;
         }
-        
+
         // Validation ajustée pour permettre à 'contrat_id' d'être vide
         if (isset($data['contrat_id']) && !empty($data['contrat_id']) && (!is_numeric($data['contrat_id']) || $data['contrat_id'] <= 0)) {
             Response::badRequest("Le champ 'contrat_id' doit être un nombre positif s'il est fourni.");
@@ -239,6 +222,7 @@ return [
             $contratId = !empty($data['contrat_id']) ? (int) $data['contrat_id'] : null;
 
             $sql = "UPDATE recettes SET 
+                        name = :name,
                         produit_id = :produit_id, 
                         customer_id = :customer_id, 
                         contrat_id = :contrat_id, 
@@ -251,8 +235,9 @@ return [
                         category = :category
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
+                ':name'             => $data['name'],
                 ':produit_id'       => $data['produit_id'],
                 ':customer_id'      => $data['customer_id'],
                 ':contrat_id'       => $contratId, // Utilisation de la variable ajustée
@@ -279,8 +264,8 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer une recette spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer une recette spécifique (suppression logique) ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
@@ -298,9 +283,9 @@ return [
         }
 
         try {
-            $sql = "DELETE FROM recettes WHERE id = :id";
+            $sql = "UPDATE recettes SET is_active = 0 WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

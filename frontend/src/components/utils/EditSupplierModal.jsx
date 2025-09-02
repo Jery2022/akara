@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-function EditSupplierModal({ supplier, onClose, onSave }) {
+function EditSupplierModal({ api, supplier, onClose, onSave }) {
   const [formData, setFormData] = useState(supplier);
 
   useEffect(() => {
@@ -11,7 +11,7 @@ function EditSupplierModal({ supplier, onClose, onSave }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value })); 
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e) => {
@@ -21,15 +21,17 @@ function EditSupplierModal({ supplier, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-lg w-full">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full h-[500px] flex flex-col overflow-hidden">
+        <h3 className="text-lg font-semibold text-white bg-emerald-600 p-4 shadow-md">
           Modifier le fournisseur
         </h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Nom:
-            </label>
+        <div className="flex-grow overflow-y-auto p-6">
+          <form id="editSupplierForm" onSubmit={handleSubmit} className="space-y-4">
+            <input type="hidden" name="id" value={formData.id || ''} />
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Nom:
+              </label>
             <input
               type="text"
               id="name"
@@ -42,7 +44,7 @@ function EditSupplierModal({ supplier, onClose, onSave }) {
           </div>
           <div>
             <label htmlFor="refContact" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Référence Contact:
+              Personne contact:
             </label>
             <input
               type="text"
@@ -83,35 +85,37 @@ function EditSupplierModal({ supplier, onClose, onSave }) {
             />
           </div>
           <div>
-            <label htmlFor="contrat_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              ID Contrat (Optionnel):
+            <label htmlFor="contrat_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Contrat:
             </label>
             <input
-              type="number"
-              id="contrat_id"
-              name="contrat_id"
-              value={formData.contrat_id || ''}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+              type="text"
+              id="contrat_name"
+              name="contrat_name"
+              value={supplier.contrat_name || 'N/A'}
+              className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400"
+              disabled
+              readOnly
             />
           </div>
-
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
-            >
-              Enregistrer
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
+        <div className="flex justify-end space-x-3 p-4 border-t dark:border-gray-700">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            form="editSupplierForm"
+            className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+          >
+            Enregistrer
+          </button>
+        </div>
       </div>
     </div>
   );

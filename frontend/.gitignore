@@ -1,23 +1,25 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dépendances
+# Ne jamais versionner le dossier node_modules
 /node_modules
 /.pnp
 .pnp.js
 
-# testing
+# Dossiers de build et de production
+# Ces fichiers sont générés lors du processus de build
+/build
 /coverage
 
-# production
-/build
-
-# misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
+# Fichiers de log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Fichiers d'environnement
+# Ne jamais versionner les secrets. Utiliser un .env.example pour les variables requises.
+.env
+.env.*
+!.env.example
+
+# Fichiers de système d'exploitation
+.DS_Store
+Thumbs.db

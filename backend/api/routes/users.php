@@ -14,57 +14,48 @@ $pdo = getPDO();
 // Ce fichier retourne un tableau de fonctions anonymes (handlers),
 // chaque fonction gérant une méthode HTTP spécifique pour la ressource 'users'.
 return [
-    // --- GESTION DES REQUÊTES GET (Récupérer tous les utilisateurs) ---
-    // Cette fonction est appelée pour une requête GET sur /api/users.
-    'GET'       => function (array $params, ?object $currentUser) use ($pdo) {
-        // AUTORISATION : Seuls les administrateurs peuvent lister tous les utilisateurs.
-        // $currentUser est passé par le routeur principal (index.php) après authentification.
-        if (! $currentUser || $currentUser->role !== 'admin') {
-            Response::forbidden('Accès refusé. Seuls les administrateurs peuvent lister les utilisateurs.');
-            return; // Arrête l'exécution après l'envoi de la réponse.
-        }
-
-        try {
-            // Exécute la requête pour récupérer tous les utilisateurs.
-            $stmt  = $pdo->query("SELECT id, email, role, statut, pseudo FROM users");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            // Renvoie la liste des utilisateurs en JSON.
-            Response::json(['users' => $items], 200);
-        } catch (\PDOException $e) {
-            // En cas d'erreur de base de données, log l'erreur et renvoie une réponse 500.
-            error_log("Erreur PDO lors de la récupération des utilisateurs: " . $e->getMessage());
-            Response::error("Erreur interne du serveur lors de la récupération des utilisateurs.", 500);
-        }
-    },
-
-    // --- GESTION DES REQUÊTES GET_ID (Récupérer un utilisateur par ID) ---
-    // Cette fonction est appelée pour une requête GET sur /api/users/{id}.
-    'GET_ID'    => function (array $params, ?object $currentUser) use ($pdo) {
-        $userId = $params['id']; // L'ID est extrait des paramètres de l'URL par le routeur.
-
-        // AUTORISATION : Un administrateur peut voir n'importe quel utilisateur.
-        // Un utilisateur normal ne peut voir que son propre profil.
-        if (! $currentUser || ($currentUser->role !== 'admin' && $currentUser->user_id !== $userId)) {
-            Response::forbidden('Accès refusé. Vous ne pouvez voir que votre propre profil.');
+    // --- GESTION DES REQUÊTES GET (Récupérer un ou plusieurs utilisateurs) ---
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::forbidden('Accès non autorisé.');
             return;
         }
 
-        try {
-            // Prépare et exécute la requête pour récupérer un utilisateur spécifique par ID.
-            $stmt = $pdo->prepare("SELECT id, email, role, statut, pseudo FROM users WHERE id = :id");
-            $stmt->execute([':id' => $userId]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $id = $params['id'] ?? null;
 
-            if ($user) {
-                // Si l'utilisateur est trouvé, le renvoie en JSON.
-                Response::json(['user' => $user], 200);
-            } else {
-                // Si l'utilisateur n'est pas trouvé, renvoie une 404 Not Found.
-                Response::notFound('Utilisateur non trouvé.');
+        if ($id) {
+            // Un admin peut voir n'importe qui, un utilisateur normal que son propre profil
+            if ($currentUser->role !== 'admin' && $currentUser->user_id != $id) {
+                Response::forbidden('Accès refusé. Vous ne pouvez voir que votre propre profil.');
+                return;
             }
-        } catch (\PDOException $e) {
-            error_log("Erreur PDO lors de la récupération de l'utilisateur: " . $e->getMessage());
-            Response::error("Erreur interne du serveur lors de la récupération de l'utilisateur.", 500);
+            try {
+                $stmt = $pdo->prepare("SELECT id, email, role, statut, pseudo FROM users WHERE id = :id");
+                $stmt->execute([':id' => $id]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($user) {
+                    Response::success('Utilisateur récupéré avec succès.', $user);
+                } else {
+                    Response::notFound('Utilisateur non trouvé.');
+                }
+            } catch (\PDOException $e) {
+                error_log("Erreur PDO GET_ID user: " . $e->getMessage());
+                Response::error("Erreur interne du serveur.", 500);
+            }
+        } else {
+            // Seuls les admins peuvent lister tous les utilisateurs
+            if ($currentUser->role !== 'admin') {
+                Response::forbidden('Accès refusé. Seuls les administrateurs peuvent lister les utilisateurs.');
+                return;
+            }
+            try {
+                $stmt = $pdo->query("SELECT id, email, role, statut, pseudo FROM users");
+                $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Utilisateurs récupérés avec succès.', $users);
+            } catch (\PDOException $e) {
+                error_log("Erreur PDO GET users: " . $e->getMessage());
+                Response::error("Erreur interne du serveur.", 500);
+            }
         }
     },
 
@@ -144,9 +135,8 @@ return [
         }
     },
 
-    // --- GESTION DES REQUÊTES PUT_ID (Mettre à jour un utilisateur par ID) ---
-    // Cette fonction est appelée pour une requête PUT sur /api/users/{id}.
-    'PUT_ID'    => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- GESTION DES REQUÊTES PUT (Mettre à jour un utilisateur par ID) ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         $userId = $params['id']; // L'ID de l'utilisateur à modifier.
 
         // AUTORISATION : Seul l'administrateur peut modifier n'importe quel utilisateur.
@@ -246,9 +236,8 @@ return [
         }
     },
 
-    // --- GESTION DES REQUÊTES DELETE_ID (Supprimer un utilisateur par ID) ---
-    // Cette fonction est appelée pour une requête DELETE sur /api/users/{id}.
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- GESTION DES REQUÊTES DELETE (Supprimer un utilisateur par ID) ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         $userId = $params['id']; // L'ID de l'utilisateur à supprimer.
 
         // AUTORISATION : Seuls les administrateurs peuvent supprimer des utilisateurs.

@@ -1,52 +1,53 @@
 <?php
-    session_start();
+require_once __DIR__ . '/../bootstrap.php'; // Inclure le fichier bootstrap pour charger les variables d'environnement
+require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/functions.php';
+session_start();
 
-    if (! isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
-        header('Location: /login.php');
-        exit;
-    }
+if (! isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+  header('Location: /login.php');
+  exit;
+}
 
-    require_once __DIR__ . '/../../config/db.php';
-    require_once __DIR__ . '/../../config/functions.php';
+$recettes = getMonthlyRecettes();
+$depenses = getMonthlyDepenses();
+$achats   = getMonthlyAchats();
+$payments = getMonthlyPayments();
 
-    $recettes = getMonthlyRecettes();
-    $depenses = getMonthlyDepenses();
-    $achats   = getMonthlyAchats();
-    $payments = getMonthlyPayments();
+$labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-    $labels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+// Créons quatre tableaux avec 12 mois initialisés à 0
+$recetteData = array_fill(0, 12, 0);
+$paymentData = array_fill(0, 12, 0);
+$achatData   = array_fill(0, 12, 0);
+$depenseData = array_fill(0, 12, 0);
 
-    // Créons quatre tableaux avec 12 mois initialisés à 0
-    $recetteData = array_fill(0, 12, 0);
-    $paymentData = array_fill(0, 12, 0);
-    $achatData   = array_fill(0, 12, 0);
-    $depenseData = array_fill(0, 12, 0);
+foreach ($recettes as $r) {
+  $mois               = (int) date('n', strtotime($r['month'])) - 1;
+  $recetteData[$mois] = (float) $r['total'];
+}
 
-    foreach ($recettes as $r) {
-        $mois               = (int) date('n', strtotime($r['month'])) - 1;
-        $recetteData[$mois] = (float) $r['total'];
-    }
+foreach ($depenses as $p) {
+  $mois               = (int) date('n', strtotime($p['month'])) - 1;
+  $depenseData[$mois] = (float) $p['total'];
+}
 
-    foreach ($depenses as $p) {
-        $mois               = (int) date('n', strtotime($p['month'])) - 1;
-        $depenseData[$mois] = (float) $p['total'];
-    }
-
-    foreach ($achats as $a) {
-        $mois             = (int) date('n', strtotime($a['month'])) - 1;
-        $achatData[$mois] = (float) $a['total'];
-    }
-    foreach ($payments as $pa) {
-        $mois               = (int) date('n', strtotime($pa['month'])) - 1;
-        $paymentData[$mois] = (float) $pa['total'];
-    }
+foreach ($achats as $a) {
+  $mois             = (int) date('n', strtotime($a['month'])) - 1;
+  $achatData[$mois] = (float) $a['total'];
+}
+foreach ($payments as $pa) {
+  $mois               = (int) date('n', strtotime($pa['month'])) - 1;
+  $paymentData[$mois] = (float) $pa['total'];
+}
 ?>
 
 <?php require_once __DIR__ . '/../views/partials/_header.php'; ?>
 <title>Akara Administration</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
 </head>
+
 <body>
   <?php require_once __DIR__ . '../../views/partials/_navbar.php'; ?>
   <div class="sidebar d-flex flex-column align-items-start">
@@ -54,42 +55,44 @@
     <hr class="w-100 my-2 border-light">
     <nav class="nav flex-column w-100">
       <?php
-          $tables = [
-              'users'      => 'Utilisateurs',
-              'suppliers'  => 'Fournisseurs',
-              'customers'  => 'Clients',
-              'employees'  => 'Employés',
-              'produits'   => 'Produits',
-              'contrats'   => 'Contrats',
-              'stock'      => 'Stock',
-              'entrepots'  => 'Entrepôts',
-              'recettes'   => 'Recettes',
-              'depenses'   => 'Dépenses',
-              'payments'   => 'Paiements',
-              'achats'     => 'Achats',
-              'factures'   => 'Factures',
-              'quittances' => 'Quittances',
-          ];
+      $tables = [
+        'users'      => 'Utilisateurs',
+        'suppliers'  => 'Fournisseurs',
+        'customers'  => 'Clients',
+        'employees'  => 'Employés',
+        'produits'   => 'Produits',
+        'contrats'   => 'Contrats',
+        'stock'      => 'Stock',
+        'entrepots'  => 'Entrepôts',
+        'recettes'   => 'Recettes',
+        'depenses'   => 'Dépenses',
+        'payments'   => 'Paiements',
+        'achats'     => 'Achats',
+        'factures'   => 'Factures',
+        'quittances' => 'Quittances',
+      ];
       foreach ($tables as $table => $label): ?>
-    <a href="/index.php?route=<?php echo htmlspecialchars($table); ?>" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
-<?php endforeach; ?>
+        <a href="/index.php?route=<?php echo htmlspecialchars($table); ?>" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
+      <?php endforeach; ?>
     </nav>
   </div>
 
-   <!-- Navigation horizontale -->
-   <header>
-      <nav class="horizontal-nav">
-<?php
-foreach ($tables as $table => $label): ?>
-    <a href="/index.php?route=<?php echo htmlspecialchars($table); ?>" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
-<?php endforeach; ?>
-      </nav>
+  <!-- Navigation horizontale -->
+  <header>
+    <nav class="horizontal-nav">
+      <?php
+      foreach ($tables as $table => $label): ?>
+        <a href="/index.php?route=<?php echo htmlspecialchars($table); ?>" class="nav-link"><?php echo htmlspecialchars($label); ?></a>
+      <?php endforeach; ?>
+    </nav>
   </header>
 
   <main class="main-content">
     <div class="titre bg-primary shadow-sm rounded mb-4">
       <div class="container-fluid">
-        <span class="navbar-brand"><h3>Tableau de bord Administrateur</h3></span>
+        <span class="navbar-brand">
+          <h3>Tableau de bord Administrateur</h3>
+        </span>
       </div>
     </div>
 
@@ -203,7 +206,7 @@ foreach ($tables as $table => $label): ?>
         datasets: [{
           label: 'Nombre',
           data: [
-            <?php echo getTotal('customers'); ?>,<?php echo getTotal('produits'); ?>,<?php echo getTotal('users'); ?>,<?php echo getTotal('employees'); ?>
+            <?php echo getTotal('customers'); ?>, <?php echo getTotal('produits'); ?>, <?php echo getTotal('users'); ?>, <?php echo getTotal('employees'); ?>
           ],
           backgroundColor: ['#0d6efd', '#198754', '#6610f2', '#d63384']
         }]
@@ -211,164 +214,163 @@ foreach ($tables as $table => $label): ?>
       options: {
         responsive: true,
         plugins: {
-          legend: { display: false }
+          legend: {
+            display: false
+          }
         }
       }
     });
   </script>
 
-<script>
-  const ctx2 = document.getElementById('StatChart2').getContext('2d');
-  const chart2 = new Chart(ctx2, {
-    type: 'bar',
-    data: {
-      labels:
-      <?php echo json_encode($labels); ?>,
-      datasets: [
-        {
-          label: 'Recettes',
-          data:
-          <?php echo json_encode($recetteData); ?>,
-          backgroundColor: 'rgba(25, 135, 84, 0.6)',
-          borderRadius: 6,
-          borderSkipped: false
-        },
-        {
-          label: 'Dépenses',
-          data:
-            <?php echo json_encode($depenseData); ?>,
-          type: 'line',
-          borderColor: '#dc3545',
-          backgroundColor: 'rgba(220, 53, 69, 0.1)',
-          pointBackgroundColor: '#dc3545',
-          tension: 0.3,
-          fill: true
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true, // false
-      interaction: {
-        mode: 'index',
-        intersect: false
+  <script>
+    const ctx2 = document.getElementById('StatChart2').getContext('2d');
+    const chart2 = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: <?php echo json_encode($labels); ?>,
+        datasets: [{
+            label: 'Recettes',
+            data: <?php echo json_encode($recetteData); ?>,
+            backgroundColor: 'rgba(25, 135, 84, 0.6)',
+            borderRadius: 6,
+            borderSkipped: false
+          },
+          {
+            label: 'Dépenses',
+            data: <?php echo json_encode($depenseData); ?>,
+            type: 'line',
+            borderColor: '#dc3545',
+            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+            pointBackgroundColor: '#dc3545',
+            tension: 0.3,
+            fill: true
+          }
+        ]
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: '#343a40',
-            font: {
-              weight: 'bold'
-            }
-          }
+      options: {
+        responsive: true,
+        maintainAspectRatio: true, // false
+        interaction: {
+          mode: 'index',
+          intersect: false
         },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              let value = context.raw.toLocaleString('fr-FR', { minimumFractionDigits: 2 });
-              return `${context.dataset.label} : ${value} €`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: {
-            display: false
-          }
-        },
-        y: {
-          beginAtZero: false, //true
-          ticks: {
-            callback: function(value) {
-              return value.toLocaleString('fr-FR');
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: '#343a40',
+              font: {
+                weight: 'bold'
+              }
             }
           },
-          grid: {
-            color: 'rgba(0,0,0,0.05)'
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let value = context.raw.toLocaleString('fr-FR', {
+                  minimumFractionDigits: 2
+                });
+                return `${context.dataset.label} : ${value} €`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            }
+          },
+          y: {
+            beginAtZero: false, //true
+            ticks: {
+              callback: function(value) {
+                return value.toLocaleString('fr-FR');
+              }
+            },
+            grid: {
+              color: 'rgba(0,0,0,0.05)'
+            }
           }
         }
       }
-    }
-  });
-</script>
+    });
+  </script>
 
-<script>
-  const ctx3 = document.getElementById('StatChart3').getContext('2d');
-  const chart3 = new Chart(ctx3, {
-    type: 'bar',
-    data: {
-      labels:
-      <?php echo json_encode($labels); ?>,
-      datasets: [
-        {
-          label: 'Paiements',
-          data:
-          <?php echo json_encode($paymentData); ?>,
-          backgroundColor: 'rgba(25, 135, 84, 0.6)',
-          borderRadius: 6,
-          borderSkipped: false
-        },
-        {
-          label: 'Achats',
-          data:
-            <?php echo json_encode($achatData); ?>,
-          type: 'line',
-          borderColor: '#dc3545',
-          backgroundColor: 'rgba(220, 53, 69, 0.1)',
-          pointBackgroundColor: '#dc3545',
-          tension: 0.3,
-          fill: true
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true, // false
-      interaction: {
-        mode: 'index',
-        intersect: false
+  <script>
+    const ctx3 = document.getElementById('StatChart3').getContext('2d');
+    const chart3 = new Chart(ctx3, {
+      type: 'bar',
+      data: {
+        labels: <?php echo json_encode($labels); ?>,
+        datasets: [{
+            label: 'Paiements',
+            data: <?php echo json_encode($paymentData); ?>,
+            backgroundColor: 'rgba(25, 135, 84, 0.6)',
+            borderRadius: 6,
+            borderSkipped: false
+          },
+          {
+            label: 'Achats',
+            data: <?php echo json_encode($achatData); ?>,
+            type: 'line',
+            borderColor: '#dc3545',
+            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+            pointBackgroundColor: '#dc3545',
+            tension: 0.3,
+            fill: true
+          }
+        ]
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: '#343a40',
-            font: {
-              weight: 'bold'
-            }
-          }
+      options: {
+        responsive: true,
+        maintainAspectRatio: true, // false
+        interaction: {
+          mode: 'index',
+          intersect: false
         },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              let value = context.raw.toLocaleString('fr-FR', { minimumFractionDigits: 2 });
-              return `${context.dataset.label} : ${value} €`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: {
-            display: false
-          }
-        },
-        y: {
-          beginAtZero: false, //true
-          ticks: {
-            callback: function(value) {
-              return value.toLocaleString('fr-FR');
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: '#343a40',
+              font: {
+                weight: 'bold'
+              }
             }
           },
-          grid: {
-            color: 'rgba(0,0,0,0.05)'
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let value = context.raw.toLocaleString('fr-FR', {
+                  minimumFractionDigits: 2
+                });
+                return `${context.dataset.label} : ${value} €`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            }
+          },
+          y: {
+            beginAtZero: false, //true
+            ticks: {
+              callback: function(value) {
+                return value.toLocaleString('fr-FR');
+              }
+            },
+            grid: {
+              color: 'rgba(0,0,0,0.05)'
+            }
           }
         }
       }
-    }
-  });
-</script>
+    });
+  </script>
 </body>
+
 </html>

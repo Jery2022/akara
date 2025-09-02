@@ -8,6 +8,7 @@ import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 // Composant de l'onglet Stock
 function StockManagementTab({ api }) {
   const [items, setItems] = useState([]);
+  const [processedItems, setProcessedItems] = useState([]);
 
   // États pour la gestion du chargement et des erreurs
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,8 @@ function StockManagementTab({ api }) {
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('produit_nom_asc');
+
 
   // Fonction pour charger les articles de stock (Read)
   const fetchItems = useCallback(async () => {
@@ -63,13 +66,48 @@ function StockManagementTab({ api }) {
     fetchItems();
   }, [fetchItems]);
 
-  // Filtrer les articles pour la recherche
-  const filteredItems = (Array.isArray(items) ? items : []).filter((item) =>
-    item.produit_nom?.toLowerCase().includes(search.toLowerCase()) ||
-    item.unit?.toLowerCase().includes(search.toLowerCase()) ||
-    item.entrepot_nom?.toLowerCase().includes(search.toLowerCase()) ||
-    item.supplier_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (Array.isArray(items)) {
+      const newProcessedItems = items.map(item => ({
+        ...item,
+        // Assurez-vous que les champs de tri textuels existent
+        produit_nom: item.produit_nom || '',
+        entrepot_nom: item.entrepot_nom || '',
+      }));
+      setProcessedItems(newProcessedItems);
+    }
+  }, [items]);
+
+  // Filtrer et trier les articles
+  const sortedAndFilteredItems = (Array.isArray(processedItems) ? processedItems : [])
+    .filter((item) =>
+      item.produit_nom?.toLowerCase().includes(search.toLowerCase()) ||
+      item.unit?.toLowerCase().includes(search.toLowerCase()) ||
+      item.entrepot_nom?.toLowerCase().includes(search.toLowerCase()) ||
+      item.supplier_name?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+      
+      const valA = a[key];
+      const valB = b[key];
+
+      // Gérer les cas où les valeurs pourraient être null ou undefined
+      if (valA == null || valB == null) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
   const openCreateModal = () => {
@@ -238,6 +276,18 @@ function StockManagementTab({ api }) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="produit_nom_asc">Produit (A-Z)</option>
+            <option value="produit_nom_desc">Produit (Z-A)</option>
+            <option value="quantity_asc">Quantité (Croissant)</option>
+            <option value="quantity_desc">Quantité (Décroissant)</option>
+            <option value="entrepot_nom_asc">Entrepôt (A-Z)</option>
+            <option value="entrepot_nom_desc">Entrepôt (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -250,7 +300,7 @@ function StockManagementTab({ api }) {
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredItems.length === 0 ? (
+        {sortedAndFilteredItems.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucun article de stock trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -268,7 +318,7 @@ function StockManagementTab({ api }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredItems.map((item) => (
+                {sortedAndFilteredItems.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.produit_nom || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{item.quantity}</td>

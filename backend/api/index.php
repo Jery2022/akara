@@ -6,44 +6,12 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// 1. Définir l'origine autorisée (votre frontend React)
-// EN DÉVELOPPEMENT: Mettre l'URL exacte de votre frontend React
-header("Access-Control-Allow-Origin: http://localhost:3000");
-
-// EN PRODUCTION: Remplacez par votre domaine réel de production, ou gérez les multiples origines avec prudence
-// $allowed_origins = ['https://votre-domaine-frontend.com', 'http://localhost:3000'];
-// if (isset($_SERVER['HTTP_ORIGIN']) && in_array($_SERVER['HTTP_ORIGIN'], $allowed_origins)) {
-//     header("Access-Control-Allow-Origin: " . $_SERVER['HTTP_ORIGIN']);
-// } else {
-//     // Si l'origine n'est pas autorisée, refuser l'accès ou envoyer une origine par défaut non permissive
-//     header("Access-Control-Allow-Origin: http://localhost:3000"); // Ou une URL non valide pour bloquer
-// }
-
-// 2. Définir les méthodes HTTP autorisées
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-
-// 3. Définir les en-têtes qui peuvent être envoyés par le client
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-// 4. Autoriser l'envoi de cookies et d'identifiants (très important car votre React utilise credentials: 'include')
-header("Access-Control-Allow-Credentials: true");
-
-// 5. Définir la durée de validité du preflight (en secondes)
-header("Access-Control-Max-Age: 86400"); // Cache la réponse preflight pendant 24 heures
-
-// 6. Gérer la requête OPTIONS (le "preflight" du navigateur)
-// Si la requête est de type OPTIONS, nous avons juste besoin d'envoyer les en-têtes CORS
-// et de terminer l'exécution du script, car il s'agit d'une vérification préalable.
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200); // Répondre avec un statut 200 OK
-    exit();                  // Terminer le script ici
-}
-
-// 7. Définir le type de contenu de la réponse pour les requêtes réelles (si votre API renvoie du JSON)
+// Les en-têtes CORS sont maintenant gérés par server.php, le point d'entrée principal.
+// On définit uniquement le Content-Type ici.
 header("Content-Type: application/json");
 
 // Inclure l'autoloader de Composer pour charger les dépendances (ex: Firebase JWT)
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../src/vendor/autoload.php';
 
 // Votre autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
@@ -57,7 +25,7 @@ spl_autoload_register(function ($className) {
 
 // Inclure explicitement Response au cas où l'autoloader ne la trouverait pas immédiatement.
 // C'est redondant avec l'autoload si bien configuré, mais ne fait pas de mal.
-require_once __DIR__ . '/Core/Response.php';
+require_once __DIR__ . '/core/Response.php';
 
 // Utilisation des classes nécessaires avec les namespaces
 use Core\Response;
@@ -158,8 +126,19 @@ function authenticateRequest(): ?object
 
 // --- DÉBUT DU ROUTAGE PRINCIPAL ---
 try {
-    // Lit le chemin de la route directement depuis le paramètre 'path' fourni par .htaccess.
-    $uri = $_GET['path'] ?? '';
+    // --- Détermination robuste du chemin de la ressource ---
+    // Cette logique fonctionne à la fois avec Apache/.htaccess et le serveur de dev PHP.
+    $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+    // Extrait le chemin sans les paramètres de requête (ex: /backend/api/suppliers/123)
+    $pathOnly = parse_url($requestUri, PHP_URL_PATH);
+
+    $apiPrefix = '/backend/api/';
+    $uri = '';
+
+    // Vérifie si l'URL commence par le préfixe de l'API et extrait le chemin de la ressource
+    if (is_string($pathOnly) && strpos($pathOnly, $apiPrefix) === 0) {
+        $uri = substr($pathOnly, strlen($apiPrefix));
+    }
 
     // Divise l'URI en segments et nettoie les segments vides.
     $routeSegments = array_values(array_filter(explode('/', trim($uri, '/'))));
@@ -195,9 +174,13 @@ try {
             // sont censées se trouver dans le sous-dossier 'routes/'.
             $filePath = __DIR__ . '/routes/' . $endpoint . '.php';
 
-            // La méthode appelée correspond directement à la méthode HTTP (GET, POST, PUT, DELETE).
-            // Le fichier de route lui-même vérifiera la présence d'un ID dans les paramètres.
-            loadRouteFile($filePath, $method, $params, $currentUser);
+            // Le handler lui-même est maintenant responsable de la gestion de l'ID.
+            $handlerMethod = $method;
+
+            // Log de débogage pour vérifier la méthode du handler
+            error_log("[ROUTER] Tentative de chargement du handler: Endpoint='{$endpoint}', File='{$filePath}', HandlerMethod='{$handlerMethod}'");
+
+            loadRouteFile($filePath, $handlerMethod, $params, $currentUser);
         }
     } else {
         // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/),

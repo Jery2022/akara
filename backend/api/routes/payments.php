@@ -24,79 +24,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer tous les paiements ---
+    // --- Méthode GET : Récupérer un ou plusieurs paiements ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            // Inclure les informations sur les clients, utilisateurs et contrats si pertinents
-            $stmt = $pdo->query("SELECT p.*, c.name AS customer_name, u.pseudo AS user_name, co.type AS contrat_type
-                                FROM payments p
-                                LEFT JOIN customers c ON p.customer_id = c.id
-                                LEFT JOIN users u ON p.user_id = u.id
-                                LEFT JOIN contrats co ON p.contrat_id = co.id
-                                ORDER BY p.date_payment DESC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Paiements récupérés avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching payments: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des paiements.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer un paiement spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
-        if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de paiement invalide ou manquant dans l\'URL.');
-            return;
-        }
-
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
+        $baseQuery = "SELECT p.*, c.name AS customer_name, e.name AS employee_name, co.type AS contrat_type
+                      FROM payments p
+                      LEFT JOIN customers c ON p.customer_id = c.id
+                      LEFT JOIN employees e ON p.user_id = e.user_id
+                      LEFT JOIN contrats co ON p.contrat_id = co.id";
 
         try {
-            // Inclure les informations sur les clients, utilisateurs et contrats si pertinents
-            $stmt = $pdo->prepare("SELECT p.*, c.name AS customer_name, u.pseudo AS user_name, co.type AS contrat_type
-                                   FROM payments p
-                                   LEFT JOIN customers c ON p.customer_id = c.id
-                                   LEFT JOIN users u ON p.user_id = u.id
-                                   LEFT JOIN contrats co ON p.contrat_id = co.id
-                                   WHERE p.id = :id");
-            $stmt->execute([':id' => $id]);
-            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de paiement invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("$baseQuery WHERE p.id = :id");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$payment) {
-                Response::notFound('Paiement non trouvé.');
-                return;
+                if (!$item) {
+                    Response::notFound('Paiement non trouvé.');
+                } else {
+                    Response::success('Paiement récupéré avec succès.', $item);
+                }
+            } else {
+                $stmt = $pdo->query("$baseQuery ORDER BY p.date_payment DESC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Paiements récupérés avec succès.', $items);
             }
-            Response::success('Paiement récupéré avec succès.', $payment);
         } catch (PDOException $e) {
-            error_log('Error fetching single payment: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération du paiement.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching payments: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des paiements.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -140,8 +108,16 @@ return [
         }
 
         try {
-            // Récupération de l'ID de l'utilisateur authentifié si disponible
-            $user_id = $currentUser->id ?? null; 
+            // Récupérer l'ID de l'employé associé à l'utilisateur connecté
+            $stmt_employee = $pdo->prepare("SELECT id FROM employees WHERE user_id = :user_id");
+            $stmt_employee->execute([':user_id' => $currentUser->id]);
+            $employee = $stmt_employee->fetch(PDO::FETCH_ASSOC);
+
+            if (!$employee) {
+                Response::error('Aucun employé associé à cet utilisateur.', 403);
+                return;
+            }
+            $user_id = $employee['id'];
 
             $type        = trim($data['type']);
             $customer_id = filter_var($data['customer_id'], FILTER_VALIDATE_INT);
@@ -167,7 +143,7 @@ return [
             $sql = "INSERT INTO payments (type, customer_id, user_id, contrat_id, description, amount, date_payment) 
                     VALUES (:type, :customer_id, :user_id, :contrat_id, :description, :amount, :date_payment)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':type'        => $type,
                 ':customer_id' => $customer_id,
@@ -183,21 +159,18 @@ return [
                 return;
             }
 
-            Response::created('Paiement ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Paiement ajouté avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating payment: ' . $e->getMessage());
             Response::error('Erreur lors de la création du paiement.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- Méthode PUT_ID : Modifier un paiement spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier un paiement spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
         }
 
@@ -236,20 +209,23 @@ return [
         }
 
         try {
+            // D'abord, vérifier si le paiement existe
+            $checkStmt = $pdo->prepare("SELECT id FROM payments WHERE id = :id");
+            $checkStmt->execute([':id' => $id]);
+            if ($checkStmt->fetch() === false) {
+                Response::notFound('Paiement non trouvé avec l\'ID spécifié.');
+                return;
+            }
+
             $type        = trim($data['type']);
             $customer_id = filter_var($data['customer_id'], FILTER_VALIDATE_INT);
             $amount      = (float) $data['amount'];
             $date_payment        = $data['date_payment'];
-            $user_id     = filter_var($data['user_id'] ?? null, FILTER_VALIDATE_INT);
             $contrat_id  = filter_var($data['contrat_id'] ?? null, FILTER_VALIDATE_INT);
             $description = $data['description'] ?? null;
 
             if ($customer_id === false || $customer_id <= 0) {
                 Response::badRequest('ID client invalide.');
-                return;
-            }
-            if ($user_id !== null && ($user_id === false || $user_id <= 0)) {
-                Response::badRequest('ID utilisateur invalide.');
                 return;
             }
             if ($contrat_id !== null && ($contrat_id === false || $contrat_id <= 0)) {
@@ -260,32 +236,25 @@ return [
             $sql = "UPDATE payments SET 
                         type = :type, 
                         customer_id = :customer_id, 
-                        user_id = :user_id, 
                         contrat_id = :contrat_id, 
                         description = :description, 
                         amount = :amount, 
-                        date = :date 
+                        date_payment = :date_payment 
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':type'        => $type,
                 ':customer_id' => $customer_id,
-                ':user_id'     => $user_id,
                 ':contrat_id'  => $contrat_id,
                 ':description' => $description,
                 ':amount'      => $amount,
-                ':date_payment'        => $date_payment,
+                ':date_payment' => $date_payment,
                 ':id'          => $id,
             ]);
 
             if (!$executed) {
                 Response::error('Erreur lors de l\'exécution de la requête de mise à jour.', 500, ['details' => $stmt->errorInfo()]);
-                return;
-            }
-
-            if ($stmt->rowCount() === 0) {
-                Response::notFound('Paiement non trouvé avec l\'ID spécifié ou aucune modification effectuée.');
                 return;
             }
 
@@ -296,14 +265,11 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer un paiement spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer un paiement spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour supprimer une ressource.');
             return;
         }
 
@@ -321,7 +287,7 @@ return [
         try {
             $sql = "DELETE FROM payments WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

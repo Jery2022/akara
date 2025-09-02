@@ -6,11 +6,12 @@ import EditCustomerModal from './utils/EditCustomerModal';
 import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
 
 // Composant de l'onglet Clients
-function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
+function CustomersTab({ api }) {
   const token = localStorage.getItem('authToken');
+  const [customers, setCustomers] = useState([]);
 
   // États pour la gestion du chargement et des erreurs
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -26,6 +27,7 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('name_asc');
 
   // Fonction pour charger les clients (Read)
   const fetchCustomers = useCallback(async () => {
@@ -54,20 +56,40 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
     } finally {
       setLoading(false);
     }
-  }, [api, token, setCustomers]);
+  }, [api, token]);
 
   // Charger les clients au montage du composant
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  // Filtrer les clients pour la recherche
-  const filteredCustomers = (Array.isArray(initialCustomers) ? initialCustomers : []).filter((customer) =>
-    customer.name?.toLowerCase().includes(search.toLowerCase()) ||
-    customer.refContact?.toLowerCase().includes(search.toLowerCase()) ||
-    customer.phone?.toLowerCase().includes(search.toLowerCase()) ||
-    customer.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filtrer et trier les clients
+  const sortedAndFilteredCustomers = (Array.isArray(customers) ? customers : [])
+    .filter((customer) =>
+      customer.name?.toLowerCase().includes(search.toLowerCase()) ||
+      customer.refContact?.toLowerCase().includes(search.toLowerCase()) ||
+      customer.phone?.toLowerCase().includes(search.toLowerCase()) ||
+      customer.email?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+      
+      const valA = a[key];
+      const valB = b[key];
+
+      if (valA == null || valB == null) return 0;
+
+      let comparison = 0;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
   const openCreateModal = () => setIsCreateModalOpen(true);
@@ -114,16 +136,31 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
   };
 
   // Gère la mise à jour d'un client
-  const handleUpdateCustomer = async (updatedCustomerData) => {
+  const handleUpdateCustomer = async (customerData) => {
     setSaving(true);
     try {
-      const response = await fetch(`${api}/customers/${updatedCustomerData.id}`, {
+      const { id, name, refContact, phone, email, contrat_id } = customerData;
+
+      if (!id || isNaN(parseInt(id))) {
+        throw new Error("ID de client manquant ou invalide dans les données à mettre à jour.");
+      }
+
+      const payload = {
+        id,
+        name,
+        refContact,
+        phone,
+        email,
+        contrat_id,
+      };
+
+      const response = await fetch(`${api}/customers/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(updatedCustomerData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -150,8 +187,10 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
         const response = await fetch(`${api}/customers/${customerId}`, {
           method: 'DELETE',
           headers: {
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
+          body: JSON.stringify({ id: customerId }),
         });
 
         if (!response.ok) {
@@ -209,6 +248,18 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="name_asc">Nom (A-Z)</option>
+            <option value="name_desc">Nom (Z-A)</option>
+            <option value="refContact_asc">Contact (A-Z)</option>
+            <option value="refContact_desc">Contact (Z-A)</option>
+            <option value="email_asc">Email (A-Z)</option>
+            <option value="email_desc">Email (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -221,7 +272,7 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredCustomers.length === 0 ? (
+        {sortedAndFilteredCustomers.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucun client trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -232,18 +283,18 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Personne contact</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Téléphone</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">ID Contrat</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Contrat</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredCustomers.map((customer) => (
+                {sortedAndFilteredCustomers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer.name}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer.refContact}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer.phone}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer.email}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer.contrat_id || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer.contrat_name || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
@@ -275,6 +326,7 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateCustomerModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateCustomer}
           loading={saving}
@@ -284,9 +336,10 @@ function CustomersTab({ customers: initialCustomers, setCustomers, api }) {
       {/* Modale de modification */}
       {isEditModalOpen && currentCustomer && (
         <EditCustomerModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateCustomer}
-          customerToEdit={currentCustomer}
+          customer={currentCustomer}
           loading={saving}
         />
       )}

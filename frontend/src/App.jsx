@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, Navigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import DashboardTab from './components/DashboardTab';
 import StockManagementTab from './components/StockManagementTab';
 import EmployeesTab from './components/EmployeesTab';
@@ -37,8 +37,8 @@ export default function App() {
   const [loadingData, setLoadingData] = useState(true); // Nouvel état pour le chargement des données
   const { addToast } = useToast();
 
-  // URL de l'API backend
-  const API_URL = 'http://localhost:8000/backend/api';
+  // URL de l'API backend. Utilise une variable d'environnement pour la production.
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/backend/api';
 
 
   // Vérification de l'authentification persistante
@@ -72,6 +72,9 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user || null);
+          if (data.user && data.user.role) {
+            localStorage.setItem('userRole', data.user.role);
+          }
           addToast('Session restaurée!', 'info');
         } else {
           console.log(
@@ -82,6 +85,7 @@ export default function App() {
             'warning'
           );
           localStorage.removeItem('authToken');
+          localStorage.removeItem('userRole');
           setUser(null);
         }
       } catch (err) {
@@ -93,6 +97,7 @@ export default function App() {
             err
           );
           localStorage.removeItem('authToken');
+          localStorage.removeItem('userRole');
           setUser(null);
           addToast(
             'Erreur de connexion au serveur. Veuillez réessayer.',
@@ -121,7 +126,6 @@ export default function App() {
   const [recettes, setRecettes] = useState([]);
   const [depenses, setDepenses] = useState([]);
   const [achats, setAchats] = useState([]);
-  const [ventes, setVentes] = useState([]);
   const [factures, setFactures] = useState([]);
   const [quittances, setQuittances] = useState([]);
 
@@ -158,7 +162,6 @@ export default function App() {
         'recettes',
         'depenses',
         'achats',
-        'ventes',
         'factures',
         'quittances',
         'payments',
@@ -166,6 +169,7 @@ export default function App() {
 
       const responses = await Promise.all(
         routes.map(async (route) => {
+          console.log(`Fetching data for: ${route}`);
           const res = await fetch(`${API_URL}/${route}`, {
             method: 'GET',
             headers: {
@@ -173,7 +177,10 @@ export default function App() {
               Authorization: `Bearer ${token}`,
             },
           });
-          if (!res.ok) throw new Error(`Erreur réseau : ${res.status}`);
+          if (!res.ok) {
+            console.error(`Failed to fetch ${route}: ${res.status}`);
+            throw new Error(`Erreur réseau pour ${route}: ${res.status}`);
+          }
           const jsonResponse = await res.json();
           // S'assurer que la propriété 'data' existe et est un tableau
           return Array.isArray(jsonResponse.data) ? jsonResponse.data : [];
@@ -191,7 +198,6 @@ export default function App() {
         recettes,
         depenses,
         achats,
-        ventes,
         factures,
         quittances,
         payments,
@@ -208,11 +214,10 @@ export default function App() {
       setRecettes(recettes);
       setDepenses(depenses);
       setAchats(achats);
-      setVentes(ventes);
       setFactures(factures);
       setQuittances(quittances);
     } catch (err) {
-      console.error('Erreur lors du chargement des données :', err);
+      console.error('Erreur détaillée lors du chargement des données :', err.message, err.stack);
       addToast(
         'Erreur lors du chargement des données : ' + err.message,
         'danger'
@@ -241,7 +246,6 @@ export default function App() {
       setRecettes([]);
       setDepenses([]);
       setAchats([]);
-      setVentes([]);
       setFactures([]);
       setQuittances([]);
       // On s'assure que le chargement est désactivé si l'utilisateur n'est pas connecté
@@ -273,6 +277,9 @@ export default function App() {
       const data = await res.json();
       const token = data.jwt;
       localStorage.setItem('authToken', token); // sauvegarde du token dans localStorage
+      if (data.user && data.user.role) {
+        localStorage.setItem('userRole', data.user.role); // Sauvegarde du rôle
+      }
 
       // Mettre à jour l'état de l'utilisateur
       setUser(data.user || { name: email });
@@ -289,6 +296,7 @@ export default function App() {
   // Déconnexion
   const handleLogout = async () => {
     localStorage.removeItem('authToken');
+    localStorage.removeItem('userRole'); // Nettoyer le rôle
     setUser(null);
   };
 
@@ -374,13 +382,19 @@ export default function App() {
               { tab: 'factures', label: 'Factures' },
               { tab: 'quittances', label: 'Quittances' },
             ].map(({ tab, label }) => (
-              <Link
+              <NavLink
                 key={tab}
                 to={`/${tab}`}
-                className={`w-full text-left px-4 py-2 rounded-lg block hover:bg-gray-200 dark:hover:bg-gray-700`}
+                className={({ isActive }) =>
+                  `w-full text-left px-4 py-2 rounded-lg block transition-colors duration-200 ${
+                    isActive
+                      ? 'bg-emerald-600 text-white font-semibold'
+                      : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`
+                }
               >
                 {label}
-              </Link>
+              </NavLink>
             ))}
           </nav>
 
@@ -394,19 +408,19 @@ export default function App() {
               <Routes>
                 <Route path="/dashboard" element={<DashboardTab stock={stockItems} recettes={recettes} depenses={depenses} />} />
                 <Route path="/stock" element={<StockManagementTab api={API_URL} />} />
-                <Route path="/employees" element={<EmployeesTab employees={employees} setEmployees={setEmployees} api={`${API_URL}/employees`} />} />
-                <Route path="/suppliers" element={<SuppliersTab suppliers={suppliers} setSuppliers={setSuppliers} api={`${API_URL}/suppliers`} />} />
-                <Route path="/customers" element={<CustomersTab customers={customers} setCustomers={setCustomers} api={`${API_URL}/customers`} />} />
-                <Route path="/payments" element={<PaymentsTab payments={payments} setPayments={setPayments} customers={customers} employees={employees} api={`${API_URL}/payments`} refetchPayments={fetchAll} />} />
-                <Route path="/produits" element={<ProduitsTab produits={produits} setProduits={setProduits} api={`${API_URL}/produits`} refetchProduits={fetchAll} />} />
-                <Route path="/contrats" element={<ContratsTab contrats={contrats} setContrats={setContrats} api={`${API_URL}/contrats`} />} />
-                <Route path="/entrepots" element={<EntrepotsTab entrepots={entrepots} setEntrepots={setEntrepots} api={`${API_URL}/entrepots`} />} />
-                <Route path="/recettes" element={<RecettesTab recettes={recettes} setRecettes={setRecettes} produits={produits} setProduits={setProduits} customers={customers} setCustomers={setCustomers} contrats={contrats} setContrats={setContrats} api={`${API_URL}`} refetchRecettes={fetchAll} />} />
-                <Route path="/depenses" element={<DepensesTab depenses={depenses} setDepenses={setDepenses} api={`${API_URL}/depenses`} />} />
-                <Route path="/achats" element={<AchatsTab achats={achats} setAchats={setAchats} api={`${API_URL}/achats`} />} />
-                <Route path="/ventes" element={<VentesTab ventes={ventes} setVentes={setVentes} api={`${API_URL}/ventes`} />} />
-                <Route path="/factures" element={<FacturesTab factures={factures} setFactures={setFactures} api={`${API_URL}/factures`} />} />
-                <Route path="/quittances" element={<QuittancesTab quittances={quittances} setQuittances={setQuittances} api={`${API_URL}/quittances`} />} />
+                <Route path="/employees" element={<EmployeesTab api={API_URL} />} />
+                <Route path="/suppliers" element={<SuppliersTab suppliers={suppliers} setSuppliers={setSuppliers} api={API_URL} />} />
+                <Route path="/customers" element={<CustomersTab api={API_URL} />} />
+                <Route path="/payments" element={<PaymentsTab payments={payments} setPayments={setPayments} customers={customers} employees={employees} api={API_URL} refetchPayments={fetchAll} />} />
+                <Route path="/produits" element={<ProduitsTab produits={produits} setProduits={setProduits} api={API_URL} refetchProduits={fetchAll} />} />
+                <Route path="/contrats" element={<ContratsTab contrats={contrats} setContrats={setContrats} api={API_URL} />} />
+                <Route path="/entrepots" element={<EntrepotsTab entrepots={entrepots} setEntrepots={setEntrepots} api={API_URL} />} />
+                <Route path="/recettes" element={<RecettesTab recettes={recettes} setRecettes={setRecettes} produits={produits} setProduits={setProduits} customers={customers} setCustomers={setCustomers} contrats={contrats} setContrats={setContrats} api={API_URL} refetchRecettes={fetchAll} />} />
+                <Route path="/depenses" element={<DepensesTab depenses={depenses} setDepenses={setDepenses} api={API_URL} />} />
+                <Route path="/achats" element={<AchatsTab achats={achats} setAchats={setAchats} api={API_URL} />} />
+                <Route path="/ventes" element={<VentesTab api={API_URL} />} />
+                <Route path="/factures" element={<FacturesTab factures={factures} setFactures={setFactures} api={API_URL} />} />
+                <Route path="/quittances" element={<QuittancesTab quittances={quittances} setQuittances={setQuittances} api={API_URL} />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             )}

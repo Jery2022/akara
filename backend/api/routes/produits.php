@@ -25,67 +25,56 @@ $pdo = getPDO();
 
 
 return [
-    // --- Méthode GET : Récupérer tous les produits ---
+    // --- Méthode GET : Récupérer un ou plusieurs produits ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            $stmt  = $pdo->query("SELECT * FROM produits ORDER BY name ASC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Produits récupérés avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching produits: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des produits.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer un produit spécifique --- 
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
-        if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de produit invalide ou manquant dans l\'URL.');
-            return;
-        }
-
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
 
         try {
-            $stmt = $pdo->prepare("SELECT * FROM produits WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $produit = $stmt->fetch(PDO::FETCH_ASSOC);
+            $baseQuery = "
+                SELECT 
+                    p.*, 
+                    s.name as supplier_name, 
+                    e.name as entrepot_name 
+                FROM 
+                    produits p
+                LEFT JOIN 
+                    suppliers s ON p.supplier_id = s.id
+                LEFT JOIN 
+                    entrepots e ON p.entrepot_id = e.id
+                WHERE p.is_active = 1
+            ";
 
-            if (!$produit) {
-                Response::notFound('Produit non trouvé.');
-                return;
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de produit invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare($baseQuery . " AND p.id = :id");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$item) {
+                    Response::notFound('Produit non trouvé.');
+                } else {
+                    Response::success('Produit récupéré avec succès.', $item);
+                }
+            } else {
+                $stmt = $pdo->query($baseQuery . " ORDER BY p.name ASC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Produits récupérés avec succès.', $items);
             }
-            Response::success('Produit récupéré avec succès.', $produit);
         } catch (PDOException $e) {
-            error_log('Error fetching single produit: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération du produit.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching produits: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des produits.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -108,7 +97,7 @@ return [
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Champs obligatoires
-        $requiredFields = ['name', 'price'];
+        $requiredFields = ['name', 'price', 'unit'];
         foreach ($requiredFields as $field) {
             if (!isset($data[$field]) || $data[$field] === '') {
                 Response::badRequest("Le champ '{$field}' est obligatoire.");
@@ -123,17 +112,30 @@ return [
         }
 
         try {
-            $name        = trim($data['name']);
-            $price       = (float) $data['price'];
+            $name = trim($data['name']);
+            $price = (float) $data['price'];
             $description = $data['description'] ?? null;
+            $unit = $data['unit'] ?? '';
+            $provenance = $data['provenance'] ?? 'local';
+            $disponibility = $data['disponibility'] ?? 'oui';
+            $delai_livraison = (int) ($data['delai_livraison'] ?? 0);
+            $supplier_id = !empty($data['supplier_id']) ? (int) $data['supplier_id'] : null;
+            $entrepot_id = !empty($data['entrepot_id']) ? (int) $data['entrepot_id'] : null;
 
-            $sql  = "INSERT INTO produits (name, description, price) VALUES (:name, :description, :price)";
+            $sql = "INSERT INTO produits (name, description, price, unit, provenance, disponibility, delai_livraison, supplier_id, entrepot_id) 
+                    VALUES (:name, :description, :price, :unit, :provenance, :disponibility, :delai_livraison, :supplier_id, :entrepot_id)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
-                ':name'        => $name,
+                ':name' => $name,
                 ':description' => $description,
-                ':price'       => $price,
+                ':price' => $price,
+                ':unit' => $unit,
+                ':provenance' => $provenance,
+                ':disponibility' => $disponibility,
+                ':delai_livraison' => $delai_livraison,
+                ':supplier_id' => $supplier_id,
+                ':entrepot_id' => $entrepot_id,
             ]);
 
             if (!$executed) {
@@ -141,21 +143,18 @@ return [
                 return;
             }
 
-            Response::created('Produit ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Produit ajouté avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating produit: ' . $e->getMessage());
             Response::error('Erreur lors de la création du produit.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- Méthode PUT_ID : Modifier un produit spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier un produit spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
         }
 
@@ -173,7 +172,7 @@ return [
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Champs obligatoires pour la mise à jour
-        $requiredFields = ['name', 'price']; // ID n'est plus obligatoire dans $data
+        $requiredFields = ['name', 'price', 'unit'];
         foreach ($requiredFields as $field) {
             if (!isset($data[$field]) || $data[$field] === '') {
                 Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
@@ -188,18 +187,40 @@ return [
         }
 
         try {
-            $name        = trim($data['name']);
-            $price       = (float) $data['price'];
+            $name = trim($data['name']);
+            $price = (float) $data['price'];
             $description = $data['description'] ?? null;
+            $unit = $data['unit'] ?? '';
+            $provenance = $data['provenance'] ?? 'local';
+            $disponibility = $data['disponibility'] ?? 'oui';
+            $delai_livraison = (int) ($data['delai_livraison'] ?? 0);
+            $supplier_id = !empty($data['supplier_id']) ? (int) $data['supplier_id'] : null;
+            $entrepot_id = !empty($data['entrepot_id']) ? (int) $data['entrepot_id'] : null;
 
-            $sql  = "UPDATE produits SET name = :name, description = :description, price = :price WHERE id = :id";
+            $sql = "UPDATE produits SET 
+                        name = :name, 
+                        description = :description, 
+                        price = :price, 
+                        unit = :unit, 
+                        provenance = :provenance, 
+                        disponibility = :disponibility, 
+                        delai_livraison = :delai_livraison, 
+                        supplier_id = :supplier_id, 
+                        entrepot_id = :entrepot_id 
+                    WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
-                ':name'        => $name,
+                ':name' => $name,
                 ':description' => $description,
-                ':price'       => $price,
-                ':id'          => $id,
+                ':price' => $price,
+                ':unit' => $unit,
+                ':provenance' => $provenance,
+                ':disponibility' => $disponibility,
+                ':delai_livraison' => $delai_livraison,
+                ':supplier_id' => $supplier_id,
+                ':entrepot_id' => $entrepot_id,
+                ':id' => $id,
             ]);
 
             if (!$executed) {
@@ -219,14 +240,11 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer un produit spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer un produit spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour supprimer une ressource.');
             return;
         }
 
@@ -242,13 +260,13 @@ return [
         }
 
         try {
-            $sql  = "DELETE FROM produits WHERE id = :id";
+            $sql  = "UPDATE produits SET is_active = 0 WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {
-                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+                Response::error('Erreur lors de l\'exécution de la requête de désactivation.', 500, ['details' => $stmt->errorInfo()]);
                 return;
             }
 
@@ -257,7 +275,7 @@ return [
                 return;
             }
 
-            Response::success('Produit supprimé avec succès.', ['id' => (int) $id]);
+            Response::success('Produit désactivé avec succès.', ['id' => (int) $id]);
         } catch (PDOException $e) {
             error_log('Error deleting produit: ' . $e->getMessage());
             Response::error('Erreur lors de la suppression du produit.', 500, ['details' => $e->getMessage()]);
