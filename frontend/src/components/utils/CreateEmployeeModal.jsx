@@ -36,7 +36,13 @@ function CreateEmployeeModal({ onClose, onSave }) {
       return;
     }
 
-    onSave(newEmployee); // Appelle la fonction onSave du parent avec les nouvelles données
+    // S'assurer que le salaire est un nombre avant de l'envoyer
+    const employeeDataToSend = {
+      ...newEmployee,
+      salary: parseFloat(newEmployee.salary) || 0,
+    };
+
+    onSave(employeeDataToSend); // Appelle la fonction onSave du parent avec les nouvelles données
   };
 
   return (

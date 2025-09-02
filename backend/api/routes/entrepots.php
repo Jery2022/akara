@@ -22,68 +22,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer tous les entrepôts ---
+    // --- Méthode GET : Récupérer un ou plusieurs entrepôts ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            // ORDER BY name ASC (harmonisation avec le frontend et schéma de DB)
-            $stmt  = $pdo->query("SELECT * FROM entrepots ORDER BY name ASC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Entrepôts récupérés avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching entrepots: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des entrepôts.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer un entrepôt spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
-        if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID d\'entrepôt invalide ou manquant dans l\'URL.');
-            return;
-        }
+        $search = $_GET['search'] ?? '';
+        $sort = $_GET['sort'] ?? 'name';
+        $order = $_GET['order'] ?? 'asc';
 
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
+        $allowedSortColumns = ['name', 'adresse', 'responsable', 'capacity'];
+        if (!in_array($sort, $allowedSortColumns)) {
+            $sort = 'name';
+        }
+        if (!in_array(strtolower($order), ['asc', 'desc'])) {
+            $order = 'asc';
         }
 
         try {
-            $stmt = $pdo->prepare("SELECT * FROM entrepots WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID d\'entrepôt invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("SELECT * FROM entrepots WHERE id = :id");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$entrepot) {
-                Response::notFound('Entrepôt non trouvé.');
-                return;
+                if (!$item) {
+                    Response::notFound('Entrepôt non trouvé.');
+                } else {
+                    Response::success('Entrepôt récupéré avec succès.', $item);
+                }
+            } else {
+                $sql = "SELECT * FROM entrepots";
+                $queryParams = [];
+                if (!empty($search)) {
+                    $sql .= " WHERE (name LIKE :search OR adresse LIKE :search OR responsable LIKE :search)";
+                    $queryParams[':search'] = '%' . $search . '%';
+                }
+                $sql .= " ORDER BY $sort $order";
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($queryParams);
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Entrepôts récupérés avec succès.', $items);
             }
-            Response::success('Entrepôt récupéré avec succès.', $entrepot);
         } catch (PDOException $e) {
-            error_log('Error fetching single entrepot: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération de l\'entrepôt.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching entrepots: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des entrepôts.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -121,15 +115,15 @@ return [
 
         try {
             $name        = trim($data['name']);
-            $adresse     = trim($data['adresse']);  
-            $responsable = trim($data['responsable']); 
+            $adresse     = trim($data['adresse']);
+            $responsable = trim($data['responsable']);
 
             $sql  = "INSERT INTO entrepots (name, adresse, responsable) VALUES (:name, :adresse, :responsable)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':name'         => $name,
-                ':adresse'      => $adresse,  
+                ':adresse'      => $adresse,
                 ':responsable'  => $responsable,
             ]);
 
@@ -138,21 +132,18 @@ return [
                 return;
             }
 
-            Response::created('Entrepôt ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Entrepôt ajouté avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating entrepot: ' . $e->getMessage());
             Response::error('Erreur lors de la création de l\'entrepôt.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- Méthode PUT_ID : Modifier un entrepôt spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier un entrepôt spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
         }
 
@@ -171,7 +162,13 @@ return [
 
         // Champs obligatoires pour la mise à jour : tous ceux que le frontend envoie
         $requiredFields = [
-            'name', 'adresse', 'email', 'telephone', 'capacity', 'quality_stockage', 'black_list'
+            'name',
+            'adresse',
+            'email',
+            'telephone',
+            'capacity',
+            'quality_stockage',
+            'black_list'
         ];
         foreach ($requiredFields as $field) {
             if (!isset($data[$field]) || $data[$field] === '') {
@@ -196,12 +193,12 @@ return [
             // Nettoyage et récupération de tous les champs
             $name             = trim($data['name']);
             $adresse          = trim($data['adresse']);
-            $responsable      = trim($data['responsable'] ?? ''); 
+            $responsable      = trim($data['responsable'] ?? '');
             $email            = trim($data['email']);
             $telephone        = trim($data['telephone']);
-            $capacity         = (float) $data['capacity'];  
+            $capacity         = (float) $data['capacity'];
             $quality_stockage = trim($data['quality_stockage']);
-            $black_list       = trim($data['black_list']);  
+            $black_list       = trim($data['black_list']);
 
             // Requête UPDATE avec tous les champs
             $sql  = "UPDATE entrepots SET 
@@ -215,7 +212,7 @@ return [
                         black_list = :black_list 
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':name'             => $name,
                 ':adresse'          => $adresse,
@@ -245,14 +242,11 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer un entrepôt spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer un entrepôt spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour supprimer une ressource.');
             return;
         }
 
@@ -270,7 +264,7 @@ return [
         try {
             $sql = "DELETE FROM entrepots WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

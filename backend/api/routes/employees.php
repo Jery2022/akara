@@ -39,13 +39,14 @@ return [
         }
 
         try {
-            // Sélectionne uniquement les employés actifs
-            $stmt  = $pdo->query("SELECT * FROM employees WHERE is_active = TRUE ORDER BY name ASC");
+            // On ne récupère que les employés actifs pour les listes de sélection.
+            $stmt = $pdo->query("SELECT id, name FROM employees WHERE is_active = TRUE ORDER BY name ASC");
             $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Employés actifs récupérés avec succès.', $items);
+
+            Response::success('Employés récupérés avec succès.', $items);
         } catch (PDOException $e) {
-            error_log('Error fetching active employees: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des employés actifs.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching employees: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des employés.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -90,12 +91,13 @@ return [
 
     // --- Méthode POST : Créer un nouvel employé (actif par défaut) ---
     'POST' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
+        // Vérification de l'authentification et des rôles
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour créer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour créer une ressource.');
+            return;
+        }
+        if (!in_array($currentUser->role, ['admin', 'RH'])) {
+            Response::forbidden('Accès refusé', 'Vous n\'avez pas les permissions nécessaires pour créer un employé.');
             return;
         }
 
@@ -104,7 +106,14 @@ return [
             return;
         }
 
-        $data = json_decode(file_get_contents('php://input'), true);
+        $raw_input = trim(file_get_contents('php://input'));
+        $data = json_decode($raw_input, true);
+
+        // Vérifier si le décodage JSON a échoué
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Response::badRequest('Données JSON invalides.');
+            return;
+        }
 
         // Champs obligatoires pour la création d'un employé
         $requiredFields = ['name', 'fonction', 'salary', 'phone', 'email', 'quality', 'category'];
@@ -114,7 +123,7 @@ return [
                 return;
             }
         }
-        
+
         // Validation spécifique de l'email
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             Response::badRequest('Email invalide.');
@@ -137,12 +146,28 @@ return [
         $salary   = (float) $data['salary'];
 
         try {
+            // Vérification de l'unicité de l'email
+            $stmt = $pdo->prepare("SELECT id FROM employees WHERE email = :email");
+            $stmt->execute([':email' => $email]);
+            if ($stmt->fetch()) {
+                Response::error('Cet email est déjà utilisé par un autre employé.', 409); // 409 Conflict
+                return;
+            }
+
+            // Vérification de l'unicité du numéro de téléphone
+            $stmt = $pdo->prepare("SELECT id FROM employees WHERE phone = :phone");
+            $stmt->execute([':phone' => $phone]);
+            if ($stmt->fetch()) {
+                Response::error('Ce numéro de téléphone est déjà utilisé par un autre employé.', 409); // 409 Conflict
+                return;
+            }
+
             $sql = "INSERT INTO employees (name, fonction, salary, phone, email, quality, category, user_id, is_active) 
                     VALUES (:name, :fonction, :salary, :phone, :email, :quality, :category, :user_id, :is_active)";
             $stmt = $pdo->prepare($sql);
 
             // Récupération de l'ID de l'utilisateur authentifié si disponible
-            $user_id = $currentUser->id ?? null; 
+            $user_id = $currentUser->id ?? null;
 
             $executed = $stmt->execute([
                 ':name'     => $name,
@@ -150,8 +175,8 @@ return [
                 ':salary'   => $salary,
                 ':phone'    => $phone,
                 ':email'    => $email,
-                ':quality'  => $quality, 
-                ':category' => $category, 
+                ':quality'  => $quality,
+                ':category' => $category,
                 ':user_id'  => $user_id, // L'ID de l'utilisateur authentifié
                 ':is_active' => TRUE, // Nouvel employé actif par défaut
             ]);
@@ -161,20 +186,21 @@ return [
                 return;
             }
 
-            Response::created('Employé créé avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Employé créé avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating employee: ' . $e->getMessage());
             Response::error('Erreur lors de la création de l\'employé.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification et des rôles
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
+            return;
+        }
+        if (!in_array($currentUser->role, ['admin', 'RH'])) {
+            Response::forbidden('Accès refusé', 'Vous n\'avez pas les permissions nécessaires pour modifier un employé.');
             return;
         }
 
@@ -233,7 +259,7 @@ return [
                         phone = :phone, 
                         email = :email, 
                         quality = :quality, 
-                        category = :category ";  
+                        category = :category ";
 
             // Ajoute is_active à la requête de mise à jour seulement si elle est fournie
             if ($is_active !== null) {
@@ -254,8 +280,8 @@ return [
                 ':salary'   => $salary,
                 ':phone'    => $phone,
                 ':email'    => $email,
-                ':quality'  => $quality, 
-                ':category' => $category, 
+                ':quality'  => $quality,
+                ':category' => $category,
                 ':id'       => $id, // Utilise l'ID extrait des paramètres de l'URL
             ];
 
@@ -281,15 +307,16 @@ return [
             Response::error('Erreur lors de la modification de l\'employé.', 500, ['details' => $e->getMessage()]);
         }
     },
-    
+
     // --- Méthode DELETE_ID : Désactiver (suppression logique) un employé spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
+        // Vérification de l'authentification et des rôles
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour supprimer une ressource.');
+            return;
+        }
+        if (!in_array($currentUser->role, ['admin', 'RH'])) {
+            Response::forbidden('Accès refusé', 'Vous n\'avez pas les permissions nécessaires pour supprimer un employé.');
             return;
         }
 
@@ -307,7 +334,7 @@ return [
 
         try {
             // Mise à jour de is_active à FALSE (suppression logique)
-            $sql = "UPDATE employees SET is_active = FALSE WHERE id = :id"; 
+            $sql = "UPDATE employees SET is_active = FALSE WHERE id = :id";
             $stmt = $pdo->prepare($sql);
             if (!$stmt) {
                 Response::error('Erreur lors de la préparation de la requête de désactivation.', 500, ['details' => $pdo->errorInfo()]);
@@ -322,7 +349,7 @@ return [
             }
 
             if ($stmt->rowCount() === 0) {
-                Response::notFound('Employé non trouvé avec l\'ID spécifié ou déjà inactif.'); 
+                Response::notFound('Employé non trouvé avec l\'ID spécifié ou déjà inactif.');
                 return;
             }
 

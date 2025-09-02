@@ -18,6 +18,8 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentDepense, setCurrentDepense] = useState(null);
+  const [createError, setCreateError] = useState(null);
+  const [editError, setEditError] = useState(null);
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -26,6 +28,8 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('date_depense_desc');
+
 
   // Fonction pour charger les dépenses (Read)
   const fetchDepenses = useCallback(async () => {
@@ -61,18 +65,48 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
     fetchDepenses();
   }, [fetchDepenses]);
 
-  // Filtrer les dépenses pour la recherche
-  const filteredDepenses = (Array.isArray(initialDepenses) ? initialDepenses : []).filter((depense) =>
-    depense.description?.toLowerCase().includes(search.toLowerCase()) ||
-    depense.nature?.toLowerCase().includes(search.toLowerCase()) ||
-    depense.category?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filtrer et trier les dépenses
+  const sortedAndFilteredDepenses = (Array.isArray(initialDepenses) ? initialDepenses : [])
+    .filter((depense) =>
+      depense.description?.toLowerCase().includes(search.toLowerCase()) ||
+      depense.nature?.toLowerCase().includes(search.toLowerCase()) ||
+      depense.category?.toLowerCase().includes(search.toLowerCase()) ||
+      depense.total?.toString().includes(search) ||
+      depense.date_depense?.toString().toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+      
+      const valA = a[key];
+      const valB = b[key];
+
+      if (valA == null || valB == null) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (key === 'date_depense') {
+        comparison = new Date(b[key]) - new Date(a[key]); // Pour les dates, plus récent en premier
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null);
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (depense) => {
+    setEditError(null);
     setCurrentDepense(depense);
     setIsEditModalOpen(true);
   };
@@ -86,6 +120,7 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
   // Gère la création d'une nouvelle dépense
   const handleCreateDepense = async (newDepenseData) => {
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/depenses`, {
         method: 'POST',
@@ -96,16 +131,18 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
         body: JSON.stringify(newDepenseData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        const errorMessage = result.details ? `${result.message} Détails: ${JSON.stringify(result.details)}` : result.message;
+        setCreateError(errorMessage || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchDepenses();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Dépense ajoutée avec succès !' });
       }
-      
-      await fetchDepenses();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Dépense ajoutée avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout de la dépense: ${err.message || err.toString()}` });
+      setCreateError(`Erreur lors de l'ajout de la dépense: ${err.message || err.toString()}`);
       console.error(err);
     } finally {
       setSaving(false);
@@ -115,6 +152,7 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
   // Gère la mise à jour d'une dépense
   const handleUpdateDepense = async (updatedDepenseData) => {
     setSaving(true);
+    setEditError(null);
     try {
       const response = await fetch(`${api}/depenses/${updatedDepenseData.id}`, {
         method: 'PUT',
@@ -125,16 +163,18 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
         body: JSON.stringify(updatedDepenseData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la mise à jour: ${errorBody.message || response.statusText}`);
+        const errorMessage = result.details ? `${result.message} Détails: ${JSON.stringify(result.details)}` : result.message;
+        setEditError(errorMessage || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchDepenses();
+        closeEditModal();
+        setMessage({ type: 'success', text: 'Dépense mise à jour avec succès !' });
       }
-      
-      await fetchDepenses();
-      closeEditModal();
-      setMessage({ type: 'success', text: 'Dépense mise à jour avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de la mise à jour de la dépense: ${err.message || err.toString()}` });
+      setEditError(`Erreur lors de la mise à jour de la dépense: ${err.message || err.toString()}`);
       console.error(err);
     } finally {
       setSaving(false);
@@ -208,6 +248,22 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="date_depense_desc">Date (Plus récent)</option>
+            <option value="date_depense_asc">Date (Plus ancien)</option>
+            <option value="total_desc">Montant (Décroissant)</option>
+            <option value="total_asc">Montant (Croissant)</option>
+            <option value="description_asc">Description (A-Z)</option>
+            <option value="description_desc">Description (Z-A)</option>
+            <option value="nature_asc">Nature (A-Z)</option>
+            <option value="nature_desc">Nature (Z-A)</option>
+            <option value="category_asc">Catégorie (A-Z)</option>
+            <option value="category_desc">Catégorie (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -220,7 +276,7 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredDepenses.length === 0 ? (
+        {sortedAndFilteredDepenses.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucune dépense trouvée.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -229,15 +285,19 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
                 <tr>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Date</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Nature</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Catégorie</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Montant</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredDepenses.map((depense) => (
+                {sortedAndFilteredDepenses.map((depense) => (
                   <tr key={depense.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{depense.date_depense}</td>
                     <td className="py-4 px-6 text-sm text-gray-600 dark:text-gray-300">{depense.description || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{depense.nature}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{depense.category}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                       {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(depense.total)}
                     </td>
@@ -272,19 +332,25 @@ function DepensesTab({ depenses: initialDepenses, setDepenses, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateDepenseModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateDepense}
           loading={saving}
+          errorMessage={createError}
+          onClearBackendError={() => setCreateError(null)}
         />
       )}
       
       {/* Modale de modification */}
       {isEditModalOpen && currentDepense && (
         <EditDepenseModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateDepense}
           depenseToEdit={currentDepense}
           loading={saving}
+          errorMessage={editError}
+          onClearBackendError={() => setEditError(null)}
         />
       )}
 

@@ -1,0 +1,24 @@
+# Dépendances
+node_modules
+
+# Fichiers de build (ils seront générés dans l'image)
+build
+
+# Fichiers de débogage
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Fichiers d'environnement locaux
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Fichiers divers
+.git
+.gitignore
+.dockerignore
+Dockerfile
+fly.toml
+README.md

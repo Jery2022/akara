@@ -27,111 +27,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $pdo = getPDO();
 
-if (! $pdo) {
-    Response::error('Échec de la connexion à la base de données.', 500);
-    return;
-}
-
-/**
- * Vérifie l'authentification via JWT.
- * @return object|null L'objet décodé du JWT si authentifié, null sinon.
- */
-function isAuthenticated(): ?object
-{
-    $headers = getallheaders();
-    if (! isset($headers['Authorization'])) {
-        return null; // Retourne null si le header n'est pas présent
-    }
-
-    $authHeader = $headers['Authorization'];
-    if (strpos($authHeader, 'Bearer ') !== 0) {
-        return null; // Retourne null si le format Bearer est incorrect
-    }
-
-    $jwt        = trim(str_replace('Bearer ', '', $authHeader));
-    $secret_key = env('JWT_SECRET_KEY');
-
-    try {
-        $decoded = JWT::decode($jwt, new Key($secret_key, 'HS256'));
-        return $decoded;
-    } catch (Exception $e) {
-        error_log('JWT Decoding Error: ' . $e->getMessage()); // Log l'erreur pour le débogage
-        return null;                                          // Retourne null en cas d'erreur de décodage
-    }
-}
-
 return [
-    'GET'       => function () use ($pdo) {
-        $currentUser = isAuthenticated();
-
-        if (! $currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
+    'GET' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
-        if (! $pdo) {
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            $stmt  = $pdo->query("SELECT * FROM customers ORDER BY name ASC");
-            $items  = $stmt ->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Clients récupérés avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching customers: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des clients.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer un client spécifique ---
-    'GET_ID'    => function (array $params) use ($pdo) {
-        $currentUser = isAuthenticated();
-        if (! $currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.',
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (! is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de client invalide ou manquant dans l\'URL.');
-            return;
-        }
+        $search = $_GET['search'] ?? '';
+        $sort = $_GET['sort'] ?? 'name';
+        $order = $_GET['order'] ?? 'asc';
 
-        if (! $pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
+        $allowedSortColumns = ['name', 'refContact', 'phone', 'email'];
+        if (!in_array($sort, $allowedSortColumns)) {
+            $sort = 'name';
+        }
+        if (!in_array(strtolower($order), ['asc', 'desc'])) {
+            $order = 'asc';
         }
 
         try {
-            // Utilisation d'un paramètre nommé pour la cohérence
-            $stmt = $pdo->prepare("SELECT * FROM customers WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de client invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("SELECT c.id, c.name, c.refContact, c.phone, c.email, c.contrat_id, co.name as contrat_name 
+                                       FROM customers c 
+                                       LEFT JOIN contrats co ON c.contrat_id = co.id 
+                                       WHERE c.is_active = 1 AND c.id = :id");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (! $customer) {
-                Response::notFound('Client non trouvé.');
-                return;
+                if (!$item) {
+                    Response::notFound('Client non trouvé.');
+                } else {
+                    Response::success('Client récupéré avec succès.', $item);
+                }
+            } else {
+                $stmt = $pdo->query("SELECT c.id, c.name, c.refContact, c.phone, c.email, c.contrat_id, co.name as contrat_name 
+                                     FROM customers c 
+                                     LEFT JOIN contrats co ON c.contrat_id = co.id 
+                                     WHERE c.is_active = 1 
+                                     ORDER BY c.name ASC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Clients récupérés avec succès.', $items);
             }
-            Response::success('Client récupéré avec succès.', $customer);
         } catch (PDOException $e) {
-            error_log('Error fetching single customer: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération du client.', 500, ['details' => $e->getMessage()]);
+            error_log('PDOException in customers.php: ' . $e->getMessage());
+            Response::error('Erreur de base de données lors de la récupération des clients.', 500);
+        } catch (Throwable $e) {
+            error_log('General error in customers.php: ' . $e->getMessage());
+            Response::error('Une erreur inattendue est survenue.', 500);
         }
     },
 
     // --- Méthode POST : Créer un nouveau client ---
-    'POST'      => function () use ($pdo) {
-        $currentUser = isAuthenticated();
-        if (! $currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour créer une ressource.'
-            );
+    'POST' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour créer une ressource.');
             return;
         }
 
@@ -163,7 +122,7 @@ return [
             return;
         }
         try {
-                                // Gestion améliorée de contrat_id
+            // Gestion améliorée de contrat_id
             $contrat_id = null; // Initialiser à null par défaut
             if (isset($data['contrat_id']) && $data['contrat_id'] !== '') {
                 $filtered_contrat_id = filter_var($data['contrat_id'], FILTER_VALIDATE_INT);
@@ -174,8 +133,8 @@ return [
                 $contrat_id = $filtered_contrat_id;
             }
 
-            $sql = "INSERT INTO customers (name, refContact, phone, email, contrat_id)
-                    VALUES (:name, :refContact, :phone, :email, :contrat_id)";
+            $sql = "INSERT INTO customers (name, refContact, phone, email, contrat_id, is_active) 
+                     VALUES (:name, :refContact, :phone, :email, :contrat_id, 1)";
 
             $stmt = $pdo->prepare($sql);
             if (! $stmt) {
@@ -191,16 +150,15 @@ return [
                 ':contrat_id' => $contrat_id,
             ]);
 
-            if (! $executed) {
+            if (!$executed) {
                 Response::error('Erreur lors de l\'exécution de la requête de création.', 500, ['details' => $stmt->errorInfo()]);
                 return;
             }
 
-            Response::created('Client ajouté avec succès.');
-
+            Response::created(['id' => $pdo->lastInsertId()], 'Client ajouté avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating customer: ' . $e->getMessage());
-                                             // Gestion plus spécifique pour les erreurs de clé étrangère
+            // Gestion plus spécifique pour les erreurs de clé étrangère
             if ($e->getCode() === '23000') { // SQLSTATE for Integrity Constraint Violation
                 Response::error('Impossible d\'ajouter le client : l\'ID du contrat spécifié n\'existe pas.', 409, ['details' => $e->getMessage()]);
             } else {
@@ -209,14 +167,10 @@ return [
         }
     },
 
-    // --- Méthode PUT_ID : Modifier un client spécifique ---
-    'PUT_ID'    => function (array $params) use ($pdo) {
-        $currentUser = isAuthenticated();
-        if (! $currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+    // --- Méthode PUT : Modifier un client spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
         }
 
@@ -255,7 +209,7 @@ return [
         }
 
         try {
-                                // Gestion améliorée de contrat_id pour la mise à jour
+            // Gestion améliorée de contrat_id pour la mise à jour
             $contrat_id = null; // Initialiser à null par défaut
             if (isset($data['contrat_id']) && $data['contrat_id'] !== '') {
                 $filtered_contrat_id = filter_var($data['contrat_id'], FILTER_VALIDATE_INT);
@@ -266,13 +220,13 @@ return [
                 $contrat_id = $filtered_contrat_id;
             }
 
-            $sql = "UPDATE customers SET
-                        name = :name,
-                        refContact = :refContact,
-                        phone = :phone,
-                        email = :email,
-                        contrat_id = :contrat_id
-                    WHERE id = :id";
+            $sql = "UPDATE customers SET 
+                        name = :name, 
+                        refContact = :refContact, 
+                        phone = :phone, 
+                        email = :email, 
+                        contrat_id = :contrat_id 
+                    WHERE id = :id";
 
             $stmt = $pdo->prepare($sql);
             if (! $stmt) {
@@ -302,7 +256,7 @@ return [
             Response::success('Client modifié avec succès.', ['id' => (int) $id]);
         } catch (PDOException $e) {
             error_log('Error updating customer: ' . $e->getMessage());
-                                             // Ajout d'une gestion plus spécifique pour les erreurs de clé étrangère
+            // Ajout d'une gestion plus spécifique pour les erreurs de clé étrangère
             if ($e->getCode() === '23000') { // SQLSTATE for Integrity Constraint Violation
                 Response::error('Impossible de modifier le client : l\'ID du contrat spécifié n\'existe pas.', 409, ['details' => $e->getMessage()]);
             } else {
@@ -311,57 +265,49 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer un client spécifique ---
-    'DELETE_ID' => function (array $params) use ($pdo) {
-        $currentUser = isAuthenticated();
-        if (! $currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+    // --- Méthode DELETE : Supprimer un client spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
+        if (!$currentUser) {
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour effectuer cette action.');
             return;
         }
 
-        $id = $params['id'] ?? null; // L'ID vient des paramètres de l'URL
-        if (! is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de client invalide ou manquant dans l\'URL.');
+        $id = $params['id'] ?? null;
+
+        if (empty($id)) {
+            $data = json_decode(file_get_contents('php://input'), true);
+            $id = $data['id'] ?? null;
+        }
+
+        if (!is_numeric($id) || $id <= 0) {
+            Response::badRequest('ID de client invalide ou manquant pour la suppression.');
             return;
         }
 
-        if (! $pdo) {
+        if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
             return;
         }
 
         try {
-            // Utilisation d'un paramètre nommé pour la cohérence
-            $stmt = $pdo->prepare("DELETE FROM customers WHERE id = :id");
-            if (! $stmt) {
-                Response::error('Erreur lors de la préparation de la requête de suppression.', 500, ['details' => $pdo->errorInfo()]);
-                return;
-            }
-
+            $sql = "UPDATE customers SET is_active = 0 WHERE id = :id";
+            $stmt = $pdo->prepare($sql);
             $executed = $stmt->execute([':id' => $id]);
 
-            if (! $executed) {
-                Response::error('Erreur lors de l\'exécution de la requête de suppression.', 500, ['details' => $stmt->errorInfo()]);
+            if (!$executed) {
+                Response::error('Erreur lors de l\'exécution de la requête de suppression logique.', 500, ['details' => $stmt->errorInfo()]);
                 return;
             }
 
             if ($stmt->rowCount() === 0) {
-                Response::notFound('Client non trouvé avec l\'ID spécifié.');
+                Response::notFound('Aucun client trouvé avec cet ID.');
                 return;
             }
 
-            Response::success('Client supprimé avec succès.', ['id' => (int) $id]);
-        } catch (PDOException $e) {
-            error_log('Error deleting customer: ' . $e->getMessage());
-                                             // Ajout d'une gestion plus spécifique pour les erreurs de clé étrangère
-            if ($e->getCode() === '23000') { // SQLSTATE for Integrity Constraint Violation
-                Response::error('Impossible de supprimer ce client car il est lié à d\'autres enregistrements (ex: ventes, contrats).', 409, ['details' => $e->getMessage()]);
-            } else {
-                Response::error('Erreur lors de la suppression du client.', 500, ['details' => $e->getMessage()]);
-            }
+            Response::success('Client désactivé avec succès.', ['id' => (int) $id]);
+        } catch (\PDOException $e) {
+            error_log("Erreur DB lors de la suppression logique du client: " . $e->getMessage());
+            Response::error('Erreur interne du serveur lors de la suppression.', 500, ['details' => $e->getMessage()]);
         }
     },
 ];

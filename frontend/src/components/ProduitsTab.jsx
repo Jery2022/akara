@@ -18,6 +18,8 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentProduit, setCurrentProduit] = useState(null);
+  const [createError, setCreateError] = useState(null);
+  const [editError, setEditError] = useState(null);
 
   // États pour les messages et la confirmation
   const [message, setMessage] = useState(null);
@@ -26,6 +28,7 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('name_asc');
 
   // Fonction pour charger les produits (Read)
   const fetchProduits = useCallback(async () => {
@@ -61,18 +64,44 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
     fetchProduits();
   }, [fetchProduits]);
 
-  // Filtrer les produits pour la recherche
-  const filteredProduits = (Array.isArray(initialProduits) ? initialProduits : []).filter((produit) =>
-    produit.name?.toLowerCase().includes(search.toLowerCase()) ||
-    produit.description?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filtrer et trier les produits
+  const sortedAndFilteredProduits = (Array.isArray(initialProduits) ? initialProduits : [])
+    .filter((produit) =>
+      produit.name?.toLowerCase().includes(search.toLowerCase()) ||
+      produit.description?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+
+      const valA = a[key];
+      const valB = b[key];
+
+      if (valA == null || valB == null) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateModal = () => {
+    setCreateError(null);
+    setIsCreateModalOpen(true);
+  };
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   const openEditModal = (produit) => {
     setCurrentProduit(produit);
+    setEditError(null);
     setIsEditModalOpen(true);
   };
   const closeEditModal = () => {
@@ -85,6 +114,7 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
   // Gère la création d'un nouveau produit
   const handleCreateProduit = async (newProduitData) => {
     setSaving(true);
+    setCreateError(null);
     try {
       const response = await fetch(`${api}/produits`, {
         method: 'POST',
@@ -95,16 +125,17 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
         body: JSON.stringify(newProduitData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la création: ${errorBody.message || response.statusText}`);
+        setCreateError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchProduits();
+        closeCreateModal();
+        setMessage({ type: 'success', text: 'Produit ajouté avec succès !' });
       }
-      
-      await fetchProduits();
-      closeCreateModal();
-      setMessage({ type: 'success', text: 'Produit ajouté avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de l'ajout du produit: ${err.message || err.toString()}` });
+      setMessage({ type: 'error', text: `Erreur lors de l'ajout du produit.` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -114,6 +145,7 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
   // Gère la mise à jour d'un produit
   const handleUpdateProduit = async (updatedProduitData) => {
     setSaving(true);
+    setEditError(null);
     try {
       const response = await fetch(`${api}/produits/${updatedProduitData.id}`, {
         method: 'PUT',
@@ -124,16 +156,17 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
         body: JSON.stringify(updatedProduitData),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`Erreur lors de la mise à jour: ${errorBody.message || response.statusText}`);
+        setEditError(result.message || `Erreur HTTP ${response.status}`);
+      } else {
+        await fetchProduits();
+        closeEditModal();
+        setMessage({ type: 'success', text: 'Produit mis à jour avec succès !' });
       }
-      
-      await fetchProduits();
-      closeEditModal();
-      setMessage({ type: 'success', text: 'Produit mis à jour avec succès !' });
     } catch (err) {
-      setMessage({ type: 'error', text: `Erreur lors de la mise à jour du produit: ${err.message || err.toString()}` });
+      setMessage({ type: 'error', text: `Erreur lors de la mise à jour du produit.` });
       console.error(err);
     } finally {
       setSaving(false);
@@ -207,6 +240,16 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="name_asc">Nom (A-Z)</option>
+            <option value="name_desc">Nom (Z-A)</option>
+            <option value="price_asc">Prix (Croissant)</option>
+            <option value="price_desc">Prix (Décroissant)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -219,7 +262,7 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredProduits.length === 0 ? (
+        {sortedAndFilteredProduits.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucun produit trouvé.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -228,18 +271,28 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
                 <tr>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Nom</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Prix</th>
-                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Unité</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Provenance</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Disponibilité</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Délai Liv.</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Fournisseur</th>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Entrepôt</th>
                   <th className="py-3 px-6 text-center text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredProduits.map((produit) => (
+                {sortedAndFilteredProduits.map((produit) => (
                   <tr key={produit.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.name}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                       {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(produit.price)}
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-600 dark:text-gray-300">{produit.description || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.unit}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.provenance}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.disponibility}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.delai_livraison} jours</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.supplier_name || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produit.entrepot_name || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-center space-x-2">
                         <button
@@ -271,19 +324,25 @@ function ProduitsTab({ produits: initialProduits, setProduits, api }) {
       {/* Modale de création */}
       {isCreateModalOpen && (
         <CreateProduitModal
+          api={api}
           onClose={closeCreateModal}
           onSave={handleCreateProduit}
           loading={saving}
+          errorMessage={createError}
+          onClearBackendError={() => setCreateError(null)}
         />
       )}
       
       {/* Modale de modification */}
       {isEditModalOpen && currentProduit && (
         <EditProduitModal
+          api={api}
           onClose={closeEditModal}
           onSave={handleUpdateProduit}
           produitToEdit={currentProduit}
           loading={saving}
+          errorMessage={editError}
+          onClearBackendError={() => setEditError(null)}
         />
       )}
 

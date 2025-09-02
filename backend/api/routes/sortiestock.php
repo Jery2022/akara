@@ -22,89 +22,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer toutes les sorties de stock ---
+    // --- Méthode GET : Récupérer une ou plusieurs sorties de stock ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour accéder à cette ressource.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            // Joindre avec les tables 'produits', 'users', 'customers', et 'entrepots'
-            $stmt = $pdo->query("SELECT s.*, 
-                                        p.nom AS produit_nom, 
-                                        u.name AS user_name, 
-                                        c.name AS customer_name,
-                                        e.nom AS entrepot_nom
-                                FROM sortieStock s 
-                                LEFT JOIN produits p ON s.produit_id = p.id
-                                LEFT JOIN users u ON s.user_id = u.id
-                                LEFT JOIN customers c ON s.customer_id = c.id
-                                LEFT JOIN entrepots e ON s.entrepot_id = e.id
-                                ORDER BY s.date DESC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Sorties de stock récupérées avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching sortieStock: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des sorties de stock.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer une sortie de stock spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        // Vérification de l'authentification
-        if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour accéder à cette ressource.'
-            );
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de sortie de stock invalide ou manquant dans l\'URL.');
-            return;
-        }
-
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
+        $baseQuery = "SELECT s.*, p.name AS produit_nom, u.name AS user_name, c.name AS customer_name, e.name AS entrepot_nom
+                      FROM sortieStock s 
+                      LEFT JOIN produits p ON s.produit_id = p.id
+                      LEFT JOIN users u ON s.user_id = u.id
+                      LEFT JOIN customers c ON s.customer_id = c.id
+                      LEFT JOIN entrepots e ON s.entrepot_id = e.id";
 
         try {
-            // Joindre avec les tables 'produits', 'users', 'customers', et 'entrepots'
-            $stmt = $pdo->prepare("SELECT s.*, 
-                                        p.nom AS produit_nom, 
-                                        u.name AS user_name, 
-                                        c.name AS customer_name,
-                                        e.nom AS entrepot_nom
-                                FROM sortieStock s 
-                                LEFT JOIN produits p ON s.produit_id = p.id
-                                LEFT JOIN users u ON s.user_id = u.id
-                                LEFT JOIN customers c ON s.customer_id = c.id
-                                LEFT JOIN entrepots e ON s.entrepot_id = e.id
-                                WHERE s.id = :id");
-            $stmt->execute([':id' => $id]);
-            $sortieStock = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de sortie de stock invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("$baseQuery WHERE s.id = :id");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$sortieStock) {
-                Response::notFound('Sortie de stock non trouvée.');
-                return;
+                if (!$item) {
+                    Response::notFound('Sortie de stock non trouvée.');
+                } else {
+                    Response::success('Sortie de stock récupérée avec succès.', $item);
+                }
+            } else {
+                $stmt = $pdo->query("$baseQuery ORDER BY s.date DESC");
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Sorties de stock récupérées avec succès.', $items);
             }
-            Response::success('Sortie de stock récupérée avec succès.', $sortieStock);
         } catch (PDOException $e) {
-            error_log('Error fetching single sortieStock: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération de la sortie de stock.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching sortieStock: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des sorties de stock.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -158,7 +117,7 @@ return [
             Response::badRequest("Le format de la date est invalide. Utilisez AAAA-MM-JJ ou AAAA-MM-JJ HH:MM:SS.");
             return;
         }
-        
+
         // Validation optionnelle de user_id
         $user_id = null;
         if (isset($data['user_id']) && $data['user_id'] !== '') {
@@ -196,7 +155,7 @@ return [
             $sql = "INSERT INTO sortieStock (produit_id, quantity, date, user_id, customer_id, entrepot_id, motif) 
                     VALUES (:produit_id, :quantity, :date, :user_id, :customer_id, :entrepot_id, :motif)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':produit_id'  => $produit_id,
                 ':quantity'    => $quantity,
@@ -212,21 +171,18 @@ return [
                 return;
             }
 
-            Response::created('Sortie de stock enregistrée avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Sortie de stock enregistrée avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating sortieStock: ' . $e->getMessage());
             Response::error('Erreur lors de l\'enregistrement de la sortie de stock.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- Méthode PUT_ID : Modifier une sortie de stock spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier une sortie de stock spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour modifier une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
         }
 
@@ -320,7 +276,7 @@ return [
                         motif = :motif 
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
                 ':produit_id'  => $produit_id,
                 ':quantity'    => $quantity,
@@ -349,14 +305,11 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer une sortie de stock spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer une sortie de stock spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
-            Response::unauthorized(
-                'Accès non autorisé',
-                'Vous devez vous authentifier pour supprimer une ressource.'
-            );
+            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour supprimer une ressource.');
             return;
         }
 
@@ -374,7 +327,7 @@ return [
         try {
             $sql = "DELETE FROM sortieStock WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

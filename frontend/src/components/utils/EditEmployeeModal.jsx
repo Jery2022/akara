@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function EditEmployeeModal({ employee, onClose, onSave }) {
+function EditEmployeeModal({ employeeToEdit: employee, onClose, onSave }) {
   const [formData, setFormData] = useState(employee);
 
   useEffect(() => {

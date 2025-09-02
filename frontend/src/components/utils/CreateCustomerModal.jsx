@@ -1,8 +1,8 @@
 // frontend/src/components/utils/CreateCustomerModal.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function CreateCustomerModal({ onClose, onSave }) {
+function CreateCustomerModal({ api, onClose, onSave }) {
   const [formData, setFormData] = useState({
     name: '',
     refContact: '',
@@ -10,6 +10,28 @@ function CreateCustomerModal({ onClose, onSave }) {
     email: '',
     contrat_id: '', // Optionnel
   });
+  const [contrats, setContrats] = useState([]);
+  const token = localStorage.getItem('authToken');
+
+  useEffect(() => {
+    const fetchContrats = async () => {
+      try {
+        const response = await fetch(`${api}/contrats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch contrats');
+        const result = await response.json();
+        if (result.data) {
+          // Filtrer les contrats pour ne garder que ceux de type 'client'
+          const clientContrats = result.data.filter(c => c.type === 'client');
+          setContrats(clientContrats);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la récupération des contrats:", error);
+      }
+    };
+    fetchContrats();
+  }, [api, token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -87,16 +109,22 @@ function CreateCustomerModal({ onClose, onSave }) {
             </div>
             <div>
               <label htmlFor="contrat_id" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                ID Contrat (Optionnel):
+                Contrat (Optionnel):
               </label>
-              <input
-                type="number"
+              <select
                 id="contrat_id"
                 name="contrat_id"
                 value={formData.contrat_id}
                 onChange={handleChange}
                 className="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
-              />
+              >
+                <option value="">Aucun contrat</option>
+                {contrats.map(contrat => (
+                  <option key={contrat.id} value={contrat.id}>
+                    {contrat.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </form>
         </div>

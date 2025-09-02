@@ -26,6 +26,7 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
 
   // État pour la recherche
   const [search, setSearch] = useState('');
+  const [sortCriteria, setSortCriteria] = useState('date_recette_desc');
 
   // Fonction pour charger les recettes (Read)
   const fetchRecettes = useCallback(async () => {
@@ -61,15 +62,40 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
     fetchRecettes();
   }, [fetchRecettes]);
 
-  // Filtrer les recettes pour la recherche
-  const filteredRecettes = (Array.isArray(initialRecettes) ? initialRecettes : []).filter((recette) => {
-    const produitNom = produits.find(p => p.id === recette.produit_id)?.name?.toLowerCase() || '';
-    const customerNom = customers.find(c => c.id === recette.customer_id)?.name?.toLowerCase() || '';
-    const contratNom = contrats.find(c => c.id === recette.contrat_id)?.ref?.toLowerCase() || '';
-    return produitNom.includes(search.toLowerCase()) ||
-      customerNom.includes(search.toLowerCase()) ||
-      contratNom.includes(search.toLowerCase());
-  });
+  // Filtrer et trier les recettes
+  const sortedAndFilteredRecettes = (Array.isArray(initialRecettes) ? initialRecettes : [])
+    .map(recette => ({
+      ...recette,
+      produit_nom: produits.find(p => p.id === recette.produit_id)?.name || '',
+      customer_nom: customers.find(c => c.id === recette.customer_id)?.name || '',
+      contrat_ref: contrats.find(c => c.id === recette.contrat_id)?.name || '',
+    }))
+    .filter((recette) =>
+      recette.produit_nom.toLowerCase().includes(search.toLowerCase()) ||
+      recette.customer_nom.toLowerCase().includes(search.toLowerCase()) ||
+      recette.contrat_ref.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const parts = sortCriteria.split('_');
+      const order = parts.pop();
+      const key = parts.join('_');
+      
+      const valA = a[key];
+      const valB = b[key];
+
+      if (valA == null || valB == null) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      }
+
+      return order === 'asc' ? comparison : -comparison;
+    });
 
   // --- Fonctions pour les modales ---
   const openCreateModal = () => setIsCreateModalOpen(true);
@@ -211,6 +237,20 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
             onChange={(e) => setSearch(e.target.value)}
             className="w-full md:w-64 p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          <select
+            value={sortCriteria}
+            onChange={(e) => setSortCriteria(e.target.value)}
+            className="w-full md:w-auto p-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="date_recette_desc">Date (Plus récent)</option>
+            <option value="date_recette_asc">Date (Plus ancien)</option>
+            <option value="total_desc">Total (Décroissant)</option>
+            <option value="total_asc">Total (Croissant)</option>
+            <option value="produit_nom_asc">Produit (A-Z)</option>
+            <option value="produit_nom_desc">Produit (Z-A)</option>
+            <option value="customer_nom_asc">Client (A-Z)</option>
+            <option value="customer_nom_desc">Client (Z-A)</option>
+          </select>
           <button
             onClick={openCreateModal}
             className="flex items-center justify-center space-x-2 w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-emerald-700 transition-colors duration-200"
@@ -223,13 +263,14 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
       </header>
 
       <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        {filteredRecettes.length === 0 ? (
+        {sortedAndFilteredRecettes.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400">Aucune recette trouvée.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-200 dark:bg-gray-700">
                 <tr>
+                  <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Référence</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Produit</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Client</th>
                   <th className="py-3 px-6 text-left text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Contrat</th>
@@ -241,11 +282,12 @@ function RecettesTab({ recettes: initialRecettes, setRecettes, produits, custome
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredRecettes.map((recette) => (
+                {sortedAndFilteredRecettes.map((recette) => (
                   <tr key={recette.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{produits.find(p => p.id === recette.produit_id)?.name || 'N/A'}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customers.find(c => c.id === recette.customer_id)?.name || 'N/A'}</td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{contrats.find(c => c.id === recette.contrat_id)?.ref || 'N/A'}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{recette.name}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{recette.produit_nom}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{recette.customer_nom}</td>
+                    <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{recette.contrat_ref || 'N/A'}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{recette.quantity}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recette.price)}</td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recette.total)}</td>

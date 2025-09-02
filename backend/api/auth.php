@@ -8,18 +8,8 @@ use Firebase\JWT\JWT;
 
 return [
     'POST' => function () {
-        // Définition des en-têtes CORS (peut aussi être centralisé dans index.php si toutes les routes d'auth le nécessitent)
-        header("Content-Type: application/json");
-        header("Access-Control-Allow-Origin: http://localhost:3000");
-        header("Access-Control-Allow-Credentials: true");
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-        // Gérer les requêtes OPTIONS (pre-flight)
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(204);
-            exit;
-        }
+        // Les en-têtes CORS sont gérés par server.php.
+        // Le Content-Type est géré par api/index.php.
 
         $pdo = getPDO();
         if (! $pdo) {
@@ -32,10 +22,6 @@ return [
         $email    = $input['email'] ?? null;
         $password = $input['password'] ?? null;
 
-        // if (! $email || ! $password) {
-        //     Response::badRequest('Email et mot de passe requis.');
-        //     return;
-        // }
 
         if (isset($input['email']) && isset($input['password'])) {
             // Assainissement de l'email
@@ -98,7 +84,6 @@ return [
                         'role'  => $user['role'],
                     ],
                 ]);
-
             } catch (\PDOException $e) {
                 error_log("Erreur DB POST auth: " . $e->getMessage());
                 Response::error('Erreur interne du serveur lors de l\'authentification.', 500);
@@ -115,16 +100,8 @@ return [
     'GET'  => function () {
         // CETTE SECTION EST CELLE QUI EST APPELÉE PAR VOTRE useEffect `checkAuth`
         // Elle s'attend à trouver le token dans l'en-tête Authorization.
-
-        header("Content-Type: application/json");
-        header("Access-Control-Allow-Origin: http://localhost:3000");
-        header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(204);
-            exit;
-        }
+        // Les en-têtes CORS sont gérés par server.php.
+        // Le Content-Type est géré par api/index.php.
 
         $pdo = getPDO();
         if (! $pdo) {
@@ -185,7 +162,6 @@ return [
                     'role'  => $decoded->data->role,
                 ],
             ]);
-
         } catch (\Firebase\JWT\ExpiredException $e) {
             Response::unauthorized('Votre session a expiré. Veuillez vous reconnecter.');
         } catch (\Firebase\JWT\SignatureInvalidException $e) {

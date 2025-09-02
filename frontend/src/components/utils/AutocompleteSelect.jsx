@@ -8,7 +8,11 @@ function AutocompleteSelect({ options, value, onChange, placeholder }) {
 
   useEffect(() => {
     const selectedOption = options.find(option => option.id === value);
-    setInputValue(selectedOption ? selectedOption.name : '');
+    if (selectedOption) {
+      setInputValue(selectedOption.name);
+    } else if (!value) {
+      setInputValue('');
+    }
   }, [value, options]);
 
   useEffect(() => {
@@ -26,18 +30,20 @@ function AutocompleteSelect({ options, value, onChange, placeholder }) {
   const handleInputChange = (e) => {
     const query = e.target.value;
     setInputValue(query);
+
     if (query) {
       setFilteredOptions(
         options.filter(option =>
-          option.name.toLowerCase().includes(query.toLowerCase())
+          option.name && option.name.toLowerCase().includes(query.toLowerCase())
         )
       );
-      setIsListOpen(true);
     } else {
-      setFilteredOptions([]);
-      setIsListOpen(false);
-      onChange(''); // Clear selection if input is cleared
+      // If query is empty, show all options and clear any selected value
+      setFilteredOptions(options);
+      onChange('');
     }
+    // Keep the list open as long as the user is typing
+    setIsListOpen(true);
   };
 
   const handleOptionClick = (option) => {

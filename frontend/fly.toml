@@ -1,0 +1,20 @@
+# fly.toml file generated for akara-frontend on 2023-10-27T15:00:00+01:00
+
+app = "akara-frontend"
+primary_region = "cdg" # Paris, France. Choisissez la région la plus proche de vos utilisateurs.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

@@ -22,59 +22,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer tous les contrats ---
+    // --- Méthode GET : Récupérer un ou plusieurs contrats ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
         }
-
         if (!$pdo) {
             Response::error('Échec de la connexion à la base de données.', 500);
-            return;
-        }
-
-        try {
-            $stmt = $pdo->query("SELECT * FROM contrats ORDER BY date_debut DESC");
-            $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            Response::success('Contrats récupérés avec succès.', $items);
-        } catch (PDOException $e) {
-            error_log('Error fetching contrats: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération des contrats.', 500, ['details' => $e->getMessage()]);
-        }
-    },
-
-    // --- Méthode GET_ID : Récupérer un contrat spécifique ---
-    'GET_ID' => function (array $params, ?object $currentUser) use ($pdo) {
-        if (!$currentUser) {
-            Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
         }
 
         $id = $params['id'] ?? null;
-        if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de contrat invalide ou manquant.');
-            return;
-        }
+        $search = $_GET['search'] ?? '';
+        $sort = $_GET['sort'] ?? 'date_debut';
+        $order = $_GET['order'] ?? 'desc';
 
-        if (!$pdo) {
-            Response::error('Échec de la connexion à la base de données.', 500);
-            return;
+        $allowedSortColumns = ['name', 'objet', 'date_debut', 'date_fin', 'montant', 'type', 'status'];
+        if (!in_array($sort, $allowedSortColumns)) {
+            $sort = 'date_debut';
+        }
+        if (!in_array(strtolower($order), ['asc', 'desc'])) {
+            $order = 'desc';
         }
 
         try {
-            $stmt = $pdo->prepare("SELECT * FROM contrats WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $contrat = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($id) {
+                if (!is_numeric($id) || $id <= 0) {
+                    Response::badRequest('ID de contrat invalide.');
+                    return;
+                }
+                $stmt = $pdo->prepare("SELECT * FROM contrats WHERE id = :id AND is_active = 1");
+                $stmt->execute([':id' => $id]);
+                $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$contrat) {
-                Response::notFound('Contrat non trouvé.');
-                return;
+                if (!$item) {
+                    Response::notFound('Contrat non trouvé.');
+                } else {
+                    Response::success('Contrat récupéré avec succès.', $item);
+                }
+            } else {
+                $sql = "SELECT * FROM contrats WHERE is_active = 1";
+                $queryParams = [];
+                if (!empty($search)) {
+                    $sql .= " WHERE (name LIKE :search OR objet LIKE :search OR type LIKE :search OR status LIKE :search)";
+                    $queryParams[':search'] = '%' . $search . '%';
+                }
+                $sql .= " ORDER BY $sort $order";
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($queryParams);
+                $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                Response::success('Contrats récupérés avec succès.', $items);
             }
-            Response::success('Contrat récupéré avec succès.', $contrat);
         } catch (PDOException $e) {
-            error_log('Error fetching single contrat: ' . $e->getMessage());
-            Response::error('Erreur lors de la récupération du contrat.', 500, ['details' => $e->getMessage()]);
+            error_log('Error fetching contrats: ' . $e->getMessage());
+            Response::error('Erreur lors de la récupération des contrats.', 500, ['details' => $e->getMessage()]);
         }
     },
 
@@ -92,15 +95,17 @@ return [
 
         $data = json_decode(file_get_contents('php://input'), true);
 
+
+
         // Champs obligatoires
-        $requiredFields = ['ref', 'objet', 'date_debut', 'date_fin', 'montant', 'date_signature', 'type'];
+        $requiredFields = ['name', 'objet', 'date_debut', 'date_fin', 'montant', 'date_signature', 'type'];
         foreach ($requiredFields as $field) {
-            if (!isset($data[$field]) || $data[$field] === '') {
-                Response::badRequest("Le champ '{$field}' est obligatoire.");
+            if (!isset($data[$field]) || trim($data[$field]) === '') {
+                Response::badRequest("Le champ '{$field}' est obligatoire A.");
                 return;
             }
         }
-        
+
         // Validation des données
         if (!is_numeric($data['montant']) || $data['montant'] <= 0) {
             Response::badRequest("Le champ 'montant' doit être un nombre positif.");
@@ -126,14 +131,14 @@ return [
             Response::badRequest("Le format de 'date_signature' est invalide. Utilisez AAAA-MM-JJ.");
             return;
         }
-        
+
         try {
-            $sql = "INSERT INTO contrats (ref, objet, date_debut, date_fin, status, montant, signataire, date_signature, fichier_contrat, type) 
-                    VALUES (:ref, :objet, :date_debut, :date_fin, :status, :montant, :signataire, :date_signature, :fichier_contrat, :type)";
+            $sql = "INSERT INTO contrats (name, objet, date_debut, date_fin, status, montant, signataire, date_signature, fichier_contrat, type) 
+                    VALUES (:name, :objet, :date_debut, :date_fin, :status, :montant, :signataire, :date_signature, :fichier_contrat, :type)";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
-                ':ref'              => $data['ref'],
+                ':name'             => $data['name'],
                 ':objet'            => $data['objet'],
                 ':date_debut'       => $data['date_debut'],
                 ':date_fin'         => $data['date_fin'],
@@ -150,23 +155,24 @@ return [
                 return;
             }
 
-            Response::created('Contrat ajouté avec succès.', ['id' => $pdo->lastInsertId()]);
+            Response::created(['id' => $pdo->lastInsertId()], 'Contrat ajouté avec succès.');
         } catch (PDOException $e) {
             error_log('Error creating contrat: ' . $e->getMessage());
             Response::error('Erreur lors de la création du contrat.', 500, ['details' => $e->getMessage()]);
         }
     },
 
-    // --- Méthode PUT_ID : Modifier un contrat spécifique ---
-    'PUT_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode PUT : Modifier un contrat spécifique ---
+    'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
         }
 
         $id = $params['id'] ?? null;
+
         if (!is_numeric($id) || $id <= 0) {
-            Response::badRequest('ID de contrat invalide ou manquant.');
+            Response::badRequest('ID de contrat invalide ou manquant dans l\'URL.');
             return;
         }
 
@@ -178,9 +184,9 @@ return [
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Champs obligatoires pour la mise à jour
-        $requiredFields = ['ref', 'objet', 'date_debut', 'date_fin', 'montant', 'date_signature', 'type'];
+        $requiredFields = ['name', 'objet', 'date_debut', 'date_fin', 'montant', 'date_signature', 'type'];
         foreach ($requiredFields as $field) {
-            if (!isset($data[$field]) || $data[$field] === '') {
+            if (!isset($data[$field]) || trim($data[$field]) === '') {
                 Response::badRequest("Le champ '{$field}' est obligatoire pour la mise à jour.");
                 return;
             }
@@ -214,7 +220,7 @@ return [
 
         try {
             $sql = "UPDATE contrats SET 
-                        ref = :ref, 
+                        name = :name, 
                         objet = :objet, 
                         date_debut = :date_debut, 
                         date_fin = :date_fin,
@@ -226,9 +232,9 @@ return [
                         type = :type
                     WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([
-                ':ref'              => $data['ref'],
+                ':name'             => $data['name'],
                 ':objet'            => $data['objet'],
                 ':date_debut'       => $data['date_debut'],
                 ':date_fin'         => $data['date_fin'],
@@ -258,8 +264,8 @@ return [
         }
     },
 
-    // --- Méthode DELETE_ID : Supprimer un contrat spécifique ---
-    'DELETE_ID' => function (array $params, ?object $currentUser) use ($pdo) {
+    // --- Méthode DELETE : Supprimer un contrat spécifique ---
+    'DELETE' => function (array $params, ?object $currentUser) use ($pdo) {
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier.');
             return;
@@ -277,9 +283,9 @@ return [
         }
 
         try {
-            $sql = "DELETE FROM contrats WHERE id = :id";
+            $sql = "UPDATE contrats SET is_active = 0 WHERE id = :id";
             $stmt = $pdo->prepare($sql);
-            
+
             $executed = $stmt->execute([':id' => $id]);
 
             if (!$executed) {

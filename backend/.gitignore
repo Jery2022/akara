@@ -1,13 +1,24 @@
-docker/
-poubelle/
-scripts/
-docker-compose.override.yml
-docker-compose.yml
+# Dépendances Composer
+# Ce dossier est généré par `composer install`
+vendor/
+
+# Fichiers d'environnement
+# Ne jamais versionner les secrets
 .env
-.env.local
-.env.demo
-.env.test
-.dockerignore
-test*.php
+.env.*
+!.env.example
+
+# Fichiers de configuration locaux de Docker Compose
+docker-compose.override.yml
+
+# Fichiers de scripts locaux
 start-docker.*
 start-local.bat
+
+# Fichiers de test et temporaires
+test*.php
+poubelle/
+
+# Fichiers de déploiement qui ne devraient pas être versionnés
+# (si .dockerignore est généré ou spécifique à un utilisateur)
+.dockerignore

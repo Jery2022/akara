@@ -1,5 +1,5 @@
 <?php
-                // backend/api/Core/Response.php
+// backend/api/Core/Response.php
 namespace Core; // Définir le namespace pour cette classe
 
 class Response
@@ -94,5 +94,4 @@ class Response
     {
         self::json(['success' => true, 'message' => $message, 'data' => $data], 200);
     }
-
 }
