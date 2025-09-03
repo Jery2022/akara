@@ -1,15 +1,15 @@
 <?php
 // Paramètres de la base de données pour la production
-define('DB_HOST', 'mysql-ejyr.alwaysdata.net');
-define('DB_USER', 'ejyr_admin_btp');
-define('DB_PASS', 'Kevazingo01');
-define('DB_NAME', 'ejyr_akara_prod');
+define('DB_HOST', getenv('DB_HOST'));
+define('DB_USER', getenv('DB_USER'));
+define('DB_PASS', getenv('DB_PASS'));
+define('DB_NAME', getenv('DB_NAME'));
 
 // Secret pour le Hash de mot de passe (si utilisé)
 //define('APP_PASSWORD_DEFAULT', 'prod_secret_hash');
 
 // Secret pour JWT (si utilisé)
-define('JWT_SECRET', 'LeMarcheestsuperCoolEn2010@');
+define('JWT_SECRET', getenv('JWT_SECRET'));
 
 // SMTP pour les emails (optionnel)
 define('SMTP_HOST', 'smtp.gmail.com');
