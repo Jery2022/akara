@@ -4,20 +4,31 @@
 // --- 1. Charger l'autoloader de Composer en premier ---
 require_once __DIR__ . '/backend/src/vendor/autoload.php';
 
-// --- 2. Définir l'environnement de l'application et charger le fichier .env correspondant ---
-$appEnv = getenv('APP_ENV') ?: 'local';
-putenv("APP_ENV={$appEnv}");
-$_ENV['APP_ENV'] = $appEnv;
+// --- 2. Charger la configuration de l'environnement ---
+$env = getenv('AKARA_ENV') ?: 'dev'; // Environnement par défaut
 
-$dotenvFilename = '.env.' . $appEnv;
+$configPath = __DIR__ . '/backend/src/';
+$configFile = '';
+switch ($env) {
+    case 'dev':
+        $configFile = $configPath . 'config.dev.php';
+        break;
+    case 'prod':
+        $configFile = $configPath . 'config.prod.php';
+        break;
+    default:
+        error_log("Environnement non reconnu: {$env}. Utilisation de l'environnement de développement par défaut.");
+        $configFile = $configPath . 'config.dev.php';
+        break;
+}
 
-if (file_exists(__DIR__ . '/' . $dotenvFilename)) {
-    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__, $dotenvFilename);
-    $dotenv->load();
-    error_log("[SERVER] Fichier d'environnement '{$dotenvFilename}' chargé avec succès.");
+if (file_exists($configFile)) {
+    require_once $configFile;
+    error_log("Fichier de configuration chargé : " . basename($configFile));
 } else {
-    error_log("[SERVER] AVERTISSEMENT : Le fichier d'environnement '{$dotenvFilename}' n'a pas été trouvé à " . __DIR__ . ".");
-    error_log("[SERVER] Les variables d'environnement requises (DB_HOST, DB_NAME, JWT_SECRET_KEY, etc.) pourraient manquer.");
+    error_log("Erreur : Le fichier de configuration '" . basename($configFile) . "' est introuvable.");
+    // Vous pouvez choisir de terminer l'exécution ou de continuer avec des valeurs par défaut
+    die("Erreur de configuration de l'application.");
 }
 
 // --- 3. Gérer les requêtes entrantes ---
@@ -48,9 +59,50 @@ if (strpos($uri, '/backend/api/') === 0) {
     exit;
 }
 
+// --- Servir les fichiers PHP du backend (ex: login.php, admin_dashboard.php) ---
+$backendPublicPath = __DIR__ . '/backend/src/public';
+$backendFilePath   = $backendPublicPath . $uri;
+
+// Si la requête est pour un fichier PHP existant dans le dossier public du backend
+if (file_exists($backendFilePath) && is_file($backendFilePath) && pathinfo($backendFilePath, PATHINFO_EXTENSION) === 'php') {
+    error_log("[SERVER] Requête PHP backend détectée. Fichier: {$backendFilePath}");
+    require $backendFilePath;
+    exit;
+}
+
+// --- Servir les fichiers statiques du backend (ex: css, js, images) ---
+// Vérifier si le fichier demandé existe dans le répertoire public du backend
+if (file_exists($backendFilePath) && !is_dir($backendFilePath)) {
+    $extension = pathinfo($backendFilePath, PATHINFO_EXTENSION);
+    $mimeTypes = [
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'svg' => 'image/svg+xml',
+        'ico' => 'image/x-icon',
+        'json' => 'application/json',
+        'html' => 'text/html',
+        'pdf' => 'application/pdf', // Ajouté pour les fichiers PDF
+    ];
+
+    $mimeType = $mimeTypes[$extension] ?? mime_content_type($backendFilePath);
+    if ($mimeType) {
+        header("Content-Type: {$mimeType}");
+    } else {
+        // Fallback si mime_content_type échoue ou n'est pas disponible
+        header("Content-Type: application/octet-stream");
+    }
+    error_log("[SERVER] Fichier statique backend détecté. Fichier: {$backendFilePath}, Type MIME: {$mimeType}");
+    readfile($backendFilePath);
+    exit;
+}
+
 // --- Servir l'application Frontend (React) ---
 $frontendPath = __DIR__ . '/frontend/public';
-$filePath = $frontendPath . $uri;
+$filePath     = $frontendPath . $uri;
 
 // Si la requête est pour un fichier statique existant (css, js, image, etc.)
 if (file_exists($filePath) && !is_dir($filePath)) {

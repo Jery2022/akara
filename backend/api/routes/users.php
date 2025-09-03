@@ -115,7 +115,7 @@ return [
             }
 
             // Hache le mot de passe avant de l'insérer dans la base de données.
-            $password_hash = password_hash($data['password'], PASSWORD_DEFAULT);
+            $password_hash = password_hash($data['password'], env('APP_PASSWORD_DEFAULT'));
             // Requête préparée pour insérer le nouvel utilisateur.
             $sql  = "INSERT INTO users (email, password_hash, role, statut, pseudo) VALUES (?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
@@ -190,8 +190,8 @@ return [
                 $updateValues[] = $email;
             }
             if ($password !== null) {
-                $password_hash  = password_hash($password, PASSWORD_DEFAULT);
-                $updateFields[] = 'password_hash = ?'; // Utilise 'password_hash' pour la colonne
+                $password_hash = password_hash($password, env('APP_PASSWORD_DEFAULT'));
+                $updateFields[] = 'password_hash = ?';
                 $updateValues[] = $password_hash;
             }
             if ($role !== null) {

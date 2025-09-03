@@ -20,10 +20,10 @@ if (empty(trim($password))) {
 echo "Génération du hash pour votre mot de passe..." . PHP_EOL;
 
 // Utilise la fonction native et sécurisée de PHP pour le hachage.
-// PASSWORD_DEFAULT est une constante qui garantit l'utilisation de l'algorithme
-// de hachage le plus fort et le plus récent disponible dans votre version de PHP (actuellement BCRYPT).
+// Utilise la constante APP_PASSWORD_DEFAULT définie dans les fichiers de configuration d'environnement.
+// Cette constante garantit l'utilisation de l'algorithme de hachage le plus fort et le plus récent disponible dans votre version de PHP (actuellement BCRYPT).
 // Cette fonction gère automatiquement la génération d'un "sel" (salt) cryptographique.
-$hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+$hashedPassword = password_hash($password, env('APP_PASSWORD_DEFAULT'));
 
 // Affiche le résultat.
 echo "------------------------------------------------------------" . PHP_EOL;

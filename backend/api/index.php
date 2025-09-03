@@ -12,6 +12,7 @@ header("Content-Type: application/json");
 
 // Inclure l'autoloader de Composer pour charger les dépendances (ex: Firebase JWT)
 require_once __DIR__ . '/../src/vendor/autoload.php';
+require_once __DIR__ . '/../src/bootstrap.php';
 
 // Votre autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
