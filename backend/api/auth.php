@@ -42,13 +42,13 @@ return [
                 }
 
                 // Récupération de la clé secrète JWT. DOIT être la même que celle utilisée pour la validation.
-                $secretKey = $_ENV['JWT_SECRET_KEY'] ?: getenv('JWT_SECRET_KEY');
+                $secretKey = $_ENV['JWT_SECRET'] ?: getenv('JWT_SECRET');
 
                 // Log de débogage pour la clé secrète lors de la génération
                 error_log("[AUTH] Clé secrète pour génération JWT: " . ($secretKey ? 'DÉFINIE (taille: ' . strlen($secretKey) . ')' : 'NON DÉFINIE'));
 
                 if (empty($secretKey)) {
-                    error_log("[AUTH] Erreur: JWT_SECRET_KEY n'est pas définie pour la génération de token.");
+                    error_log("[AUTH] Erreur: JWT_SECRET n'est pas définie pour la génération de token.");
                     Response::error('Erreur de configuration du serveur lors de la génération du token.', 500);
                     return;
                 }
@@ -56,8 +56,8 @@ return [
                 // Définition du payload du JWT
                 $issuedAt       = time();
                 $expirationTime = $issuedAt + (60 * 60 * 24);           // Token valide 24 heures
-                $issuer         = "http://localhost:8000/backend/api/"; // Qui émet le token
-                $audience       = "http://localhost:3000";              // Pour qui le token est destiné
+                $issuer         = "https://akara-backend.fly.dev/"; // ou "http://localhost:8000/backend/api/"; // Qui émet le token
+                $audience       = "https://akara-frontend.fly.dev/";         // ou "http://localhost:3000";              // Pour qui le token est destiné
 
                 $payload = [
                     'iat'  => $issuedAt,
@@ -98,7 +98,7 @@ return [
     },
 
     'GET'  => function () {
-        // CETTE SECTION EST CELLE QUI EST APPELÉE PAR VOTRE useEffect `checkAuth`
+        // CETTE SECTION EST CELLE QUI EST APPELÉE PAR useEffect `checkAuth`
         // Elle s'attend à trouver le token dans l'en-tête Authorization.
         // Les en-têtes CORS sont gérés par server.php.
         // Le Content-Type est géré par api/index.php.
@@ -124,10 +124,10 @@ return [
             return;
         }
 
-        // --- Logique de validation du token JWT ---
-        $secretKey = $_ENV['JWT_SECRET_KEY'] ?: getenv('JWT_SECRET_KEY');
+        // --- Logique de validation du token JWT ---  
+        $secretKey = $_ENV['JWT_SECRET'] ?: getenv('JWT_SECRET');
         if (empty($secretKey)) {
-            error_log("[AUTH] Erreur: JWT_SECRET_KEY non définie pour la validation de token.");
+            error_log("[AUTH] Erreur: JWT_SECRET non définie pour la validation de token.");
             Response::error('Erreur de configuration du serveur.', 500);
             return;
         }
@@ -144,7 +144,6 @@ return [
             // ... autres données comme email, role ...
 
             // Optionnel: vérifier si l'utilisateur existe toujours en base de données
-            // ... votre code de vérification DB ...
             $stmt = $pdo->prepare("SELECT id, email, password, role FROM users WHERE email = ?");
             $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);

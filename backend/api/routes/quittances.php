@@ -5,14 +5,6 @@ require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response
 
 use Core\Response;
-// Les classes JWT ne sont pas utilisées directement ici si l'authentification est gérée par le routeur
-
-// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"); // Ajout de OPTIONS
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 // Gestion des requêtes OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

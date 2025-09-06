@@ -6,13 +6,6 @@ use Core\Response; // Utilisation de la classe Response pour les retours cohére
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://localhost:3000");
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, GET_ID, POST, PUT, PUT_ID, DELETE, DELETE_ID, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-
 // Gestion des requêtes OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);

@@ -38,7 +38,8 @@ export default function App() {
   const { addToast } = useToast();
 
   // URL de l'API backend. Utilise une variable d'environnement pour la production.
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/backend/api';
+  // S'assure que l'URL ne se termine pas par un slash pour éviter les doubles slashes.
+  const API_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace(/\/+$/, '') : '';
 
 
   // Vérification de l'authentification persistante

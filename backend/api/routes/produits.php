@@ -8,12 +8,6 @@ use Core\Response;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-// Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 // Gestion des requêtes OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

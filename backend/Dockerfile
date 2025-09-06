@@ -54,8 +54,8 @@ RUN chown -R www-data:www-data /var/www/html && \
     find /var/www/html -type d -exec chmod 755 {} \; && \
     find /var/www/html -type f -exec chmod 644 {} \;
 
-# Activer le module rewrite d'Apache
-RUN a2enmod rewrite
+# Activer les modules Apache nécessaires
+RUN a2enmod rewrite headers
 
 # Appliquer la configuration Apache personnalisée
 COPY docker/apache-conf.conf /etc/apache2/sites-available/000-default.conf

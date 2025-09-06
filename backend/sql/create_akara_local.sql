@@ -689,6 +689,7 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `pseudo`, `email`, `password`, `employee_id`, `role`, `statut`, `created_at`) VALUES
 (1, 'ejyr241', 'jewomba@hotmail.com', '$2y$10$bW/E5UeWT.JVcLt/dQ9pZOAh1Me6wgus5ogsRIqJR4gaWp6iZdyPy', 11, 'admin', 'actif', '2025-06-11 23:08:55'),
 (2, 'Blaisot', 'blaise@example.com', '$2y$10$1O26w2ZDsqo5FLGlp7Tb3uT8xZVPjDz.A4JHcP86BHhdpW5txzCgu', NULL, 'admin', 'désactivé', '2025-06-12 21:44:04'),
+(3, 'admin', 'admin@example.com', '$2y$10$bW/E5UeWT.JVcLt/dQ9pZOAh1Me6wgus5ogsRIqJR4gaWp6iZdyPy', 11, 'admin', 'actif', '2025-06-11 23:08:55'),
 (13, 'charles', 'refaze@uytr.com', '$2y$10$MXTtzHoV1BChX5qcyEqqjO/MaqtcLJ8G5JGDO9SNRjDtYPBpFwITe', 13, 'employe', 'actif', '2025-07-02 20:33:44'),
 (23, 'Yvon', 'moyvon@test.com', '$2y$10$7ywK20ZbzuQTgqkfEWqRleaX/vTjZFSjTujb8S/BTe5H6cEx/2C/.', 27, 'employe', 'actif', '2025-07-14 17:41:21'),
 (25, 'Pierrot', 'pierrot@test.com', '$2y$10$viWlvfimBeXnpbfvMsw3K.ZvTqFLhaNE7L7uSMGaaLKmOXyN/B3de', 29, 'employe', 'actif', '2025-07-14 18:37:57');

@@ -1,8 +1,12 @@
 # Étape 1: Construire l'application React
 # Utilisation de la version LTS la plus récente de Node.js sur une base Alpine pour la sécurité et la taille.
-FROM node:24-alpine as buil
+FROM node:24-alpine as build
 
 WORKDIR /app
+
+# Définir l'URL de l'API pour le frontend
+# Utiliser un chemin relatif pour que Nginx puisse agir comme proxy inverse.
+ENV REACT_APP_API_URL=/api
 
 # Copier package.json et package-lock.json pour profiter de la mise en cache
 COPY package*.json ./

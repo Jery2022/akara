@@ -6,15 +6,14 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Les en-têtes CORS sont maintenant gérés par server.php, le point d'entrée principal.
-// On définit uniquement le Content-Type ici.
+// définition uniquement du Content-Type.
 header("Content-Type: application/json");
 
 // Inclure l'autoloader de Composer pour charger les dépendances (ex: Firebase JWT)
 require_once __DIR__ . '/../src/vendor/autoload.php';
 require_once __DIR__ . '/../src/bootstrap.php';
 
-// Votre autoloader pour les classes locales (comme Core\Response)
+// Autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
     // Convertit le namespace en chemin de fichier (ex: Core\Response -> Core/Response.php)
     // __DIR__ ici est backend/api/
@@ -25,7 +24,7 @@ spl_autoload_register(function ($className) {
 });
 
 // Inclure explicitement Response au cas où l'autoloader ne la trouverait pas immédiatement.
-// C'est redondant avec l'autoload si bien configuré, mais ne fait pas de mal.
+// si l'autoload pas bien configuré.
 require_once __DIR__ . '/core/Response.php';
 
 // Utilisation des classes nécessaires avec les namespaces
@@ -88,10 +87,10 @@ function authenticateRequest(): ?object
     }
 
     $jwt = $matches[1];
-    error_log("[AUTH] JWT extrait: " . substr($jwt, 0, 20) . '...'); // Log partiel du JWT
+    error_log("[AUTH] JWT extrait: " . substr($jwt, 0, 20) . '...'); // Débogage partiel du JWT
 
-    // Récupère la clé secrète. Assurez-vous que JWT_SECRET_KEY est définie dans votre .env.
-    $secretKey = $_ENV['JWT_SECRET_KEY'] ?: getenv('JWT_SECRET_KEY');
+    // Récupère la clé secrète JWT_SECRET définie dans votre .env.
+    $secretKey = $_ENV['JWT_SECRET'] ?: getenv('JWT_SECRET');
 
     // Débogage : Vérifie si la clé secrète est chargée
     error_log("[AUTH] Clé secrète JWT via getenv(): " . ($secretKey ? 'DÉFINIE (taille: ' . strlen($secretKey) . ')' : 'NON DÉFINIE'));
@@ -104,7 +103,7 @@ function authenticateRequest(): ?object
 
     try {
         $decoded = JWT::decode($jwt, new Key($secretKey, 'HS256'));
-        error_log("[AUTH] JWT décodé avec succès."); // Log de succès
+        error_log("[AUTH] JWT décodé avec succès."); // Débogage de succès
         return $decoded->data;                          // Retourne l'objet 'data' du payload, contenant user_id, email, role.
     } catch (\Firebase\JWT\ExpiredException $e) {
         error_log("[AUTH ERROR] Token JWT expiré: " . $e->getMessage());
@@ -184,7 +183,7 @@ try {
             loadRouteFile($filePath, $handlerMethod, $params, $currentUser);
         }
     } else {
-        // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/),
+        // Si l'URI est vide (par exemple, un accès direct à http://localhost:8000/backend/api/ ou votre URL réelle https://akara-backend.fly.dev/ en production),
         Response::json(['message' => 'Bienvenue sur votre API RESTful !', 'version' => '1.0'], 200);
     }
 } catch (\Throwable $e) {

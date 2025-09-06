@@ -1,8 +1,6 @@
 <?php
 // backend/api/routes/users.php
 
-// Inclut la connexion à la base de données.
-// Le chemin est correct pour aller de backend/api/routes/ à backend/config/
 require_once __DIR__ . '/../../config/db.php';
 
 // Utilise la classe Response pour des réponses JSON uniformes.

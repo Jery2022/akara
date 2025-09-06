@@ -1,13 +1,17 @@
 <?php
-// server.php
+// backend/server.php
 
-// --- 1. Charger l'autoloader de Composer en premier ---
-require_once __DIR__ . '/backend/src/vendor/autoload.php';
+// --- 1. Charger l'autoloader de Composer et le bootstrap de l'application ---
+require_once __DIR__ . '/src/bootstrap.php';
 
 // --- 2. Charger la configuration de l'environnement ---
-$env = getenv('AKARA_ENV') ?: 'dev'; // Environnement par défaut
+$env = trim(getenv('AKARA_ENV') ?: 'dev'); // Environnement par défaut
 
-$configPath = __DIR__ . '/backend/src/';
+// Ajout de débogage pour voir la valeur exacte de $env
+error_log("Valeur de AKARA_ENV lue par PHP: '" . $env . "' (après trim)");
+error_log("Toutes les variables d'environnement PHP: " . print_r(getenv(), true));
+
+$configPath = __DIR__ . '/src/';
 $configFile = '';
 switch ($env) {
     case 'dev':
@@ -36,31 +40,19 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 
 // --- Routeur pour l'API ---
-if (strpos($uri, '/backend/api/') === 0) {
-    // Définition des en-têtes CORS pour l'API
-    header("Access-Control-Allow-Origin: http://localhost:3000");
-    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-    header("Access-Control-Allow-Credentials: true");
-    header("Access-Control-Max-Age: 86400");
-
-    if ($requestMethod == 'OPTIONS') {
-        http_response_code(200);
-        exit();
-    }
-
-    $apiPath = substr($uri, strlen('/backend/api/'));
+if (strpos($uri, '/api/') === 0) {
+    $apiPath = substr($uri, strlen('/api/'));
     // Ne pas utiliser $_GET car il n'est pas fiable pour les requêtes PUT/DELETE avec le serveur intégré.
     // On passe plutôt une variable locale au script inclus.
     $path = $apiPath;
 
     error_log("[SERVER] Requête API détectée. URI: {$uri}, Path: {$path}");
-    require __DIR__ . '/backend/api/index.php';
+    require __DIR__ . '/api/index.php';
     exit;
 }
 
 // --- Servir les fichiers PHP du backend (ex: login.php, admin_dashboard.php) ---
-$backendPublicPath = __DIR__ . '/backend/src/public';
+$backendPublicPath = __DIR__ . '/src/public';
 $backendFilePath   = $backendPublicPath . $uri;
 
 // Si la requête est pour un fichier PHP existant dans le dossier public du backend

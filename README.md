@@ -30,15 +30,14 @@
 
 ### Depuis le dossier akara
 
-### Lancer le script de lancement : .\start_akara.bat
+### Lancer le script de lancement : .\start_backend.bat
 
 ### Ton backend sera accessible ici : 👉 http://localhost:8000/
 
 ## Lancement du frontend en local
 
-### Depuis le dossier akara
+### Depuis le dossier akara/frontend
 
 ### Lancer le script de lancement : npm start
 
 ### Ton frontend sera accessible ici : 👉 http://localhost:3000/
-
