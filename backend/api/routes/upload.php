@@ -1,7 +1,7 @@
 <?php
 // backend/api/routes/upload.php
 
-require_once __DIR__ . '/../../../vendor/autoload.php';
+require_once __DIR__ . '/../../src/vendor/autoload.php';
 
 use Core\Response;
 

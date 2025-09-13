@@ -42,13 +42,14 @@ return [
                 }
 
                 // Récupération de la clé secrète JWT. DOIT être la même que celle utilisée pour la validation.
-                $secretKey = $_ENV['JWT_SECRET'] ?: getenv('JWT_SECRET');
+                // Récupération de la clé secrète JWT via la fonction env().
+                $secretKey = env('JWT_SECRET');
 
                 // Log de débogage pour la clé secrète lors de la génération
-                error_log("[AUTH] Clé secrète pour génération JWT: " . ($secretKey ? 'DÉFINIE (taille: ' . strlen($secretKey) . ')' : 'NON DÉFINIE'));
+                error_log("[AUTH] Clé secrète pour génération JWT: " . (empty($secretKey) ? 'NON DÉFINIE OU VIDE' : 'DÉFINIE (taille: ' . strlen($secretKey) . ')'));
 
                 if (empty($secretKey)) {
-                    error_log("[AUTH] Erreur: JWT_SECRET n'est pas définie pour la génération de token.");
+                    error_log("[AUTH] Erreur: JWT_SECRET n'est pas définie ou est vide pour la génération de token.");
                     Response::error('Erreur de configuration du serveur lors de la génération du token.', 500);
                     return;
                 }
@@ -75,6 +76,7 @@ return [
                 $jwt = JWT::encode($payload, $secretKey, 'HS256');
 
                 // Réponse de succès avec le token
+                error_log("[AUTH] Appel de Response::json pour la connexion réussie."); // Debug log
                 Response::json([
                     'message' => 'Connexion réussie',
                     'jwt'     => $jwt,
@@ -125,9 +127,10 @@ return [
         }
 
         // --- Logique de validation du token JWT ---  
-        $secretKey = $_ENV['JWT_SECRET'] ?: getenv('JWT_SECRET');
+        // Récupération de la clé secrète JWT via la fonction env().
+        $secretKey = env('JWT_SECRET');
         if (empty($secretKey)) {
-            error_log("[AUTH] Erreur: JWT_SECRET non définie pour la validation de token.");
+            error_log("[AUTH] Erreur: JWT_SECRET non définie ou est vide pour la validation de token.");
             Response::error('Erreur de configuration du serveur.', 500);
             return;
         }

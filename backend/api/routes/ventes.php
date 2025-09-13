@@ -2,7 +2,7 @@
 // backend/api/routes/ventes.php
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response, et JWT si utilisé globalement
+require_once __DIR__ . '/../../src/vendor/autoload.php'; // Pour Core\Response, et JWT si utilisé globalement
 
 use Core\Response;
 use Firebase\JWT\JWT;

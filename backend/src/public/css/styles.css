@@ -1,7 +1,11 @@
 body {
-  font-family: 'Segoe UI', sans-serif;
-  min-height: 100vh;
-  background: #e1e1e1;
+    margin: 0;
+    font-family: Arial, sans-serif;
+    /* display: flex;
+    justify-content: center;
+    align-items: center; */
+    min-height: 100vh;
+    background-color: #f4f4f4;
   /* overflow: hidden; empêche le scroll global */
 }
 

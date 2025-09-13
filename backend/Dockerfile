@@ -43,7 +43,6 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copier les fichiers de l'application
 COPY . .
 
-
 # Installer les dépendances Composer
 WORKDIR /var/www/html/src
 RUN composer install --no-interaction --no-dev --optimize-autoloader

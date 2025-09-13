@@ -52,6 +52,7 @@ export default function App() {
 
       // récupération du token d'authentification
       const token = localStorage.getItem('authToken');
+      console.log(token); // Log de débogage
 
       if (!token) {
         // Si pas de token, l'utilisateur n'est pas authentifié
@@ -62,7 +63,7 @@ export default function App() {
 
       try {
         const res = await fetch(`${API_URL}/auth`, {
-          method: 'GET',
+          method: 'GET', // Utiliser GET pour la vérification de session
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,

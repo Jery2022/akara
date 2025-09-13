@@ -14,8 +14,10 @@ class Response
     {
         http_response_code($statusCode);
         header('Content-Type: application/json');
-        echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-        exit; // Arrête l'exécution du script après l'envoi de la réponse
+        $jsonContent = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        error_log("[Response::json] Sending JSON (status {$statusCode}): " . $jsonContent); // Debug log
+        echo $jsonContent;
+        // exit; // Commenté pour le débogage, pourrait être la cause de la réponse vide
     }
 
     /**

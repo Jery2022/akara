@@ -15,8 +15,9 @@
   # Laisser passer login.php directement
   RewriteCond %{REQUEST_URI} !^/login\.php$
 
-  # Réécrire toutes les autres requêtes vers index.php
+  # Si la requête n'est pas un fichier ou un répertoire existant,
+  # la réécrire vers index.php (qui est le point d'entrée du frontend/backend public)
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^ index.php [QSA,L]
+  RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>

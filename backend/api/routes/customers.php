@@ -6,7 +6,7 @@ ini_set('display_errors', 'Off');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour JWT et Core\Response
+require_once __DIR__ . '/../../src/vendor/autoload.php'; // Pour JWT et Core\Response
 
 use Core\Response; // Importation de la classe Response
 use Firebase\JWT\JWT;

@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../../vendor/autoload.php';
+require_once __DIR__ . '/../../src/vendor/autoload.php';
 
 use Core\Response; // Utilisation de la classe Response pour les retours cohérents
 use Firebase\JWT\JWT;

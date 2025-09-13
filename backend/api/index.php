@@ -1,17 +1,22 @@
 <?php
 // backend/api/index.php
 
+// Log de test pour vérifier si le fichier est atteint
+error_log("[DEBUG] backend/api/index.php est atteint.");
+
 // Active l'affichage des erreurs PHP (utile en développement)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// définition uniquement du Content-Type.
-header("Content-Type: application/json");
 
 // Inclure l'autoloader de Composer pour charger les dépendances (ex: Firebase JWT)
 require_once __DIR__ . '/../src/vendor/autoload.php';
 require_once __DIR__ . '/../src/bootstrap.php';
+
+// Inclure explicitement Response au cas où l'autoloader ne la trouverait pas immédiatement.
+// si l'autoload pas bien configuré.
+require_once __DIR__ . '/core/Response.php';
 
 // Autoloader pour les classes locales (comme Core\Response)
 spl_autoload_register(function ($className) {
@@ -23,14 +28,38 @@ spl_autoload_register(function ($className) {
     }
 });
 
-// Inclure explicitement Response au cas où l'autoloader ne la trouverait pas immédiatement.
-// si l'autoload pas bien configuré.
-require_once __DIR__ . '/core/Response.php';
-
 // Utilisation des classes nécessaires avec les namespaces
 use Core\Response;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+
+// Charger la configuration de l'environnement
+$env = trim(getenv('AKARA_ENV') ?: 'prod'); // Utiliser 'prod' par défaut pour l'API
+$configPath = __DIR__ . '/../src/';
+$configFile = '';
+switch ($env) {
+    case 'dev':
+        $configFile = $configPath . 'config.dev.php';
+        break;
+    case 'prod':
+        $configFile = $configPath . 'config.prod.php';
+        break;
+    default:
+        error_log("Environnement API non reconnu: {$env}. Utilisation de l'environnement de production par défaut.");
+        $configFile = $configPath . 'config.prod.php';
+        break;
+}
+
+if (file_exists($configFile)) {
+    require_once $configFile;
+    error_log("[API] Fichier de configuration chargé : " . basename($configFile));
+} else {
+    error_log("[API] Erreur : Le fichier de configuration '" . basename($configFile) . "' est introuvable.");
+    // Nous ne pouvons pas utiliser Response::error ici car la classe n'est pas encore chargée.
+    http_response_code(500);
+    echo json_encode(['error' => true, 'message' => 'Erreur de configuration de l\'API.']);
+    exit;
+}
 
 /**
  * Fonction utilitaire pour charger un fichier de route et exécuter le handler.
@@ -89,20 +118,20 @@ function authenticateRequest(): ?object
     $jwt = $matches[1];
     error_log("[AUTH] JWT extrait: " . substr($jwt, 0, 20) . '...'); // Débogage partiel du JWT
 
-    // Récupère la clé secrète JWT_SECRET définie dans votre .env.
-    $secretKey = $_ENV['JWT_SECRET'] ?: getenv('JWT_SECRET');
+    // Récupère la clé secrète JWT_SECRET définie dans votre .env ou config.prod.php.
+    $secretKey = JWT_SECRET;
 
     // Débogage : Vérifie si la clé secrète est chargée
-    error_log("[AUTH] Clé secrète JWT via getenv(): " . ($secretKey ? 'DÉFINIE (taille: ' . strlen($secretKey) . ')' : 'NON DÉFINIE'));
+    error_log("[AUTH] Clé secrète JWT via constante: " . (defined('JWT_SECRET') ? 'DÉFINIE (taille: ' . strlen(JWT_SECRET) . ')' : 'NON DÉFINIE'));
 
-    if (empty($secretKey)) {
-        error_log("[AUTH] Erreur : JWT_SECRET n'est pas définie dans l'environnement.");
+    if (! defined('JWT_SECRET') || empty($secretKey)) {
+        error_log("[AUTH] Erreur : JWT_SECRET n'est pas définie ou est vide dans l'environnement.");
         Response::error('Erreur de configuration du serveur.', 500); // 500 car c'est une erreur serveur
         return null;
     }
 
     try {
-        $decoded = JWT::decode($jwt, new Key($secretKey, 'HS256'));
+        $decoded = JWT::decode($jwt, new \Firebase\JWT\Key($secretKey, 'HS256'));
         error_log("[AUTH] JWT décodé avec succès."); // Débogage de succès
         return $decoded->data;                          // Retourne l'objet 'data' du payload, contenant user_id, email, role.
     } catch (\Firebase\JWT\ExpiredException $e) {
@@ -132,7 +161,7 @@ try {
     // Extrait le chemin sans les paramètres de requête (ex: /backend/api/suppliers/123)
     $pathOnly = parse_url($requestUri, PHP_URL_PATH);
 
-    $apiPrefix = '/backend/api/';
+    $apiPrefix = '/api/';
     $uri = '';
 
     // Vérifie si l'URL commence par le préfixe de l'API et extrait le chemin de la ressource
@@ -157,6 +186,15 @@ try {
 
     $currentUser = null;
 
+    // --- Débogage du routage ---
+    error_log("[ROUTER DEBUG] pathOnly: " . ($pathOnly ?? 'NULL'));
+    error_log("[ROUTER DEBUG] uri: " . ($uri ?? 'NULL'));
+    error_log("[ROUTER DEBUG] routeSegments: " . implode(', ', $routeSegments));
+    error_log("[ROUTER DEBUG] endpoint: " . $endpoint);
+    error_log("[ROUTER DEBUG] method: " . $method);
+    error_log("[ROUTER DEBUG] is_public_route (in_array): " . (in_array($endpoint, $publicRoutes) ? 'TRUE' : 'FALSE'));
+    // --- Fin du débogage du routage ---
+
     // Application du middleware d'authentification si la route n'est pas publique
     if (! in_array($endpoint, $publicRoutes)) {
         $currentUser = authenticateRequest(); // Si l'authentification échoue, un exit est appelé ici.
@@ -168,6 +206,7 @@ try {
         $coreApiRoutes = ['auth', 'me']; // 'me' devrait être protégé si c'est pour l'utilisateur courant
 
         if (in_array($endpoint, $coreApiRoutes)) {
+            error_log("[ROUTER] Appel de loadRouteFile pour route core: " . __DIR__ . '/' . $endpoint . '.php');
             loadRouteFile(__DIR__ . '/' . $endpoint . '.php', $method, $params, $currentUser);
         } else {
             // Toutes les autres routes (ex: 'users', 'products', 'suppliers')
