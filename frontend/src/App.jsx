@@ -41,6 +41,7 @@ export default function App() {
   // S'assure que l'URL ne se termine pas par un slash pour éviter les doubles slashes.
   const API_URL = process.env.REACT_APP_API_URL ? process.env.REACT_APP_API_URL.replace(/\/+$/, '') : '';
 
+  console.log('API_URL:', API_URL); // Log de débogage
 
   // Vérification de l'authentification persistante
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function App() {
 
       // récupération du token d'authentification
       const token = localStorage.getItem('authToken');
-      console.log(token); // Log de débogage
+      console.log(token); // Log de débogage 
 
       if (!token) {
         // Si pas de token, l'utilisateur n'est pas authentifié

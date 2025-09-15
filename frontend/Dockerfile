@@ -24,8 +24,8 @@ RUN npm run build
 # Utilisation d'une version Nginx spécifique et récente sur une base Alpine.
 FROM nginx:alpine3.22-perl
 
-# Copier la configuration Nginx personnalisée
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copier la configuration Nginx personnalisée en tant que template
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 
 # Copier les fichiers de build de l'étape précédente
 COPY --from=build /app/build /usr/share/nginx/html
@@ -33,5 +33,11 @@ COPY --from=build /app/build /usr/share/nginx/html
 # Exposer le port 80
 EXPOSE 80
 
-# Démarrer Nginx
+# Démarrer Nginx, en exécutant envsubst au démarrage pour injecter les variables d'environnement
+# Copier le script d'entrée personnalisé et le rendre exécutable
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Utiliser le script d'entrée personnalisé
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
