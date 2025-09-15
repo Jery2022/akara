@@ -38,7 +38,7 @@ export default function App() {
   const { addToast } = useToast();
 
   // URL de l'API backend. Utilise une variable d'environnement pour la production.
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/backend/api';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://akara-backend.fly.dev';
 
 
   // Vérification de l'authentification persistante

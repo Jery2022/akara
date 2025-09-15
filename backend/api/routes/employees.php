@@ -7,11 +7,11 @@ require_once __DIR__ . '/../../../vendor/autoload.php'; // Pour Core\Response
 use Core\Response;
 
 // Headers CORS. Idéalement, gérés par un middleware dans le routeur principal.
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"); // Ajout de OPTIONS
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+// header("Content-Type: application/json");
+// header("Access-Control-Allow-Origin: http://localhost:3000"); // Adaptez à votre frontend
+// header("Access-Control-Allow-Credentials: true");
+// header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"); // Ajout de OPTIONS
+// header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 // Gestion des requêtes OPTIONS (preflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $pdo = getPDO();
 
 return [
-    // --- Méthode GET : Récupérer tous les employés ACTIFS ---
+    // --- Méthode GET : Récupérer tous les employés (actifs ou inactifs) ---
     'GET' => function (array $params, ?object $currentUser) use ($pdo) {
         // Vérification de l'authentification
         if (!$currentUser) {
@@ -39,9 +39,15 @@ return [
         }
 
         try {
-            // On ne récupère que les employés actifs pour les listes de sélection.
-            $stmt = $pdo->query("SELECT id, name FROM employees WHERE is_active = TRUE ORDER BY name ASC");
+            // Récupère tous les employés avec tous leurs détails
+            $stmt = $pdo->query("SELECT id, name, fonction, salary, phone, email, quality, category, is_active FROM employees ORDER BY name ASC");
             $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Convertir 'is_active' en booléen pour le frontend
+            $items = array_map(function ($item) {
+                $item['is_active'] = (bool)$item['is_active'];
+                return $item;
+            }, $items);
 
             Response::success('Employés récupérés avec succès.', $items);
         } catch (PDOException $e) {
