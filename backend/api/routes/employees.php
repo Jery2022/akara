@@ -32,8 +32,7 @@ return [
         }
 
         try {
-            // On ne récupère que les employés actifs pour les listes de sélection.
-            $stmt = $pdo->query("SELECT id, name FROM employees WHERE is_active = TRUE ORDER BY name ASC");
+            $stmt = $pdo->query("SELECT id, name, fonction, salary, phone, email, quality, category, is_active FROM employees WHERE is_active = TRUE ORDER BY name ASC");
             $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             Response::success('Employés récupérés avec succès.', $items);

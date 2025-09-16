@@ -26,7 +26,6 @@ function EditStockModal({ api, stockItem, onClose, onSave }) {
         });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-        console.log(`[DEBUG] Fetched ${name}:`, data.data); // Ajout d'un log de débogage
         setData(data.data || []);
       } catch (err) {
         console.error(`Failed to fetch ${name}:`, err);

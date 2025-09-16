@@ -195,7 +195,7 @@ function EmployeesTab({ api }) {
     setConfirmAction(() => async () => {
       setSaving(true);
       try {
-        const response = await fetch(`${api}/${employeeId}`, {
+        const response = await fetch(`${api}/employees/${employeeId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
