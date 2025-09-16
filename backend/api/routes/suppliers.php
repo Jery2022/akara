@@ -1,4 +1,3 @@
-
 <?php
 // backend/api/routes/suppliers.php
 
