@@ -131,6 +131,7 @@ return [
 
     // --- Méthode PUT : Modifier un achat spécifique ---
     'PUT' => function (array $params, ?object $currentUser) use ($pdo) {
+        error_log("[DEBUG] PUT /achats/{$params['id']} called. Data: " . file_get_contents('php://input')); // Log au début de la méthode PUT
         if (!$currentUser) {
             Response::unauthorized('Accès non autorisé', 'Vous devez vous authentifier pour modifier une ressource.');
             return;
@@ -167,7 +168,7 @@ return [
 
             $sql = "UPDATE achats SET 
                         name = :name, type = :type, amount = :amount, date_achat = :date_achat, category = :category, 
-                        user_id = :user_id, supplier_id = :supplier_id, contrat_id = :contrat_id, description = :description, status = :status 
+                        user_id = :user_id, suppliers_id = :suppliers_id, contrat_id = :contrat_id, description = :description, status = :status 
                     WHERE id = :id";
 
             $stmt = $pdo->prepare($sql);
@@ -179,7 +180,7 @@ return [
                 ':date_achat'  => $data['date_achat'],
                 ':category'    => $data['category'],
                 ':user_id'     => $user_id,
-                ':supplier_id' => $data['supplier_id'] ?? null,
+                ':suppliers_id' => $data['supplier_id'] ?? null, // Correction ici
                 ':contrat_id'  => $data['contrat_id'] ?? null,
                 ':description' => $data['description'] ?? null,
                 ':status'      => $data['status'] ?? 'en attente',

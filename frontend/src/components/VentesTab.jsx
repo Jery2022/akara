@@ -37,9 +37,10 @@ function VentesTab({ api }) {
     setLoading(true);
     setError(null);
     try {
-      const url = new URL(`${api}/ventes`);
+      // Assurez-vous que 'api' est une URL absolue ou utilisez une URL de base
+      // const url = new URL(`${api}/ventes`, window.location.origin);
 
-      const response = await fetch(url, {
+      const response = await fetch(`${api}/ventes`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
